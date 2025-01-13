@@ -148,6 +148,10 @@ elif "semilep" in args.phase:
 elif "dilep" in args.phase:
     input_txt = r"t$\bar{t}$ dileptonic"
     nj = 2
+# TODO: check nj and label
+elif "btag_ttbar" in args.phase:
+    input_txt = r"t$\bar{t}$ dileptonic"
+    nj = 2
 if (
     "njet" in args.variable.split(",")
     or "nbjet" in args.variable.split(",")
@@ -611,10 +615,10 @@ for index, discr in enumerate(var_set):
         ax.set_yscale("log")
         name = "log"
         ax.set_ylim(bottom=0.1)
-        hep.mpl_magic(ax=ax, soft_fail=True)
-        fig.savefig(
-            f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.pdf"
-        )
+        hep.mpl_magic(ax=ax)
+        # fig.savefig(
+        #     f"plot/BTV/{args.phase}_{args.ext}_{time}/unc_{discr}_inclusive{scale}_{name}.pdf"
+        # )
         fig.savefig(
             f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.png"
         )
@@ -623,9 +627,9 @@ for index, discr in enumerate(var_set):
             "creating:",
             f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.png",
         )
-        fig.savefig(
-            f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.pdf"
-        )
+        # fig.savefig(
+        #     f"plot/BTV/{args.phase}_{args.ext}_{time}/unc_{discr}_inclusive{scale}_{name}.pdf"
+        # )
         fig.savefig(
             f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.png"
         )
