@@ -992,12 +992,15 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
             if "correctionlib" in str(type(correct_map["EGM"])):
                 ## Reco SF -splitted pT
                 if "Reco" in sf:
-                    if "Summer22" not in correct_map["campaign"]:
+                    if not any(
+                        campaign in correct_map["campaign"]
+                        for campaign in ["Summer22", "Summer23"]
+                    ):
                         ele_pt = np.where(ele.pt < 20.0, 20.0, ele.pt)
                         ele_pt_low = np.where(ele.pt >= 20.0, 19.9, ele.pt)
                         sfs_low = np.where(
                             (~mask) & (~masknone),
-                            correct_map["EGM"][correct_map["EGM_cfg"][sf]].evaluate(
+                            correct_map["EGM"][sf.split(" ")[2]].evaluate(
                                 sf.split(" ")[1],
                                 "sf",
                                 "RecoBelow20",
@@ -1010,7 +1013,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                         sfs = np.where(
                             mask & (~masknone),
                             correct_map["EGM"][sf.split(" ")[2]].evaluate(
-                                sf.split(" ")[1], "sf", "RecoAbove20", ele_eta, ele_pt
+                                sf.split(" ")[1], "sf", "RecoAbove20", ele_eta, ele_pt, ele.phi
                             ),
                             sfs_low,
                         )
@@ -1100,7 +1103,12 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                         sfs = np.where(
                             (ele.pt > 20.0) & (ele.pt <= 75.0) & (~masknone),
                             correct_map["EGM"][sf.split(" ")[2]].evaluate(
-                                sf.split(" ")[1], "sf", "Reco20to75", ele_eta, ele_pt
+                                sf.split(" ")[1],
+                                "sf",
+                                "Reco20to75",
+                                ele_eta,
+                                ele_pt,
+                                ele.phi,
                             ),
                             sfs_high,
                         )
@@ -1681,9 +1689,9 @@ def weight_manager(pruned_ev, SF_map, isSyst):
                 syst_wei,
             )
         if "MUO" in SF_map.keys() and "SelMuon" in pruned_ev.fields:
-            muSFs(pruned_ev.Muon, SF_map, weights, syst_wei, False)
+            muSFs(pruned_ev.SelMuon, SF_map, weights, syst_wei, False)
         if "EGM" in SF_map.keys() and "SelElectron" in pruned_ev.fields:
-            eleSFs(pruned_ev.Electron, SF_map, weights, syst_wei, False)
+            eleSFs(pruned_ev.SelElectron, SF_map, weights, syst_wei, False)
         if "BTV" in SF_map.keys() and "SelJet" in pruned_ev.fields:
             btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetC", syst_wei)
             btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetB", syst_wei)
