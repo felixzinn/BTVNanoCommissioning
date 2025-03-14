@@ -98,7 +98,7 @@ class NanoProcessor(processor.ProcessorABC):
             "semittE": "ectag_Wc_sf",  # same histogram representation as W+c
         }
         output = (
-            {"": None}
+            {}
             if self.noHist
             else histogrammer(
                 events, histoname[self.selMod], self._year, self._campaign
@@ -400,14 +400,20 @@ class NanoProcessor(processor.ProcessorABC):
             isRealData = False
             genflavor = ak.values_astype(
                 pruned_ev.SelJet.hadronFlavour
-                + 1 * (pruned_ev.SelJet.partonFlavour == 0)
-                & (pruned_ev.SelJet.hadronFlavour == 0),
+                + 1
+                * (
+                    (pruned_ev.SelJet.partonFlavour == 0)
+                    & (pruned_ev.SelJet.hadronFlavour == 0)
+                ),
                 int,
             )
             if "MuonJet" in pruned_ev.fields:
                 smflav = ak.values_astype(
-                    1 * (pruned_ev.MuonJet.partonFlavour == 0)
-                    & (pruned_ev.MuonJet.hadronFlavour == 0)
+                    1
+                    * (
+                        (pruned_ev.MuonJet.partonFlavour == 0)
+                        & (pruned_ev.MuonJet.hadronFlavour == 0)
+                    )
                     + pruned_ev.MuonJet.hadronFlavour,
                     int,
                 )

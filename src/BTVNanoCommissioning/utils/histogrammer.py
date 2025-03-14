@@ -497,7 +497,7 @@ def histogrammer(events, workflow, year="2022", campaign="Summer22"):
                                 syst_axis,
                                 flav_axis,
                                 osss_axis,
-                                jpt_axis,
+                                pt_axis,
                                 Hist.storage.Weight(),
                             )
 
