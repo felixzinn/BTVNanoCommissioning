@@ -36,12 +36,15 @@ def scaleSumW(output, lumi):
             )
     merged_output = merge_output(output)
 
+    # btag_iterative_sf exports xsection as well, skip this key
+    merged_output.pop("xsection", None)
     for sample, accu in merged_output.items():
         scaled[sample] = {}
         for key, h_obj in accu.items():
             scaled[sample]["sumw"] = merged_output[sample]["sumw"]
             if isinstance(h_obj, hist.Hist):
-                h = copy.deepcopy(h_obj)
+                # TODO: is deepcopy needed, if yes, why? uses lots of ram
+                h = h_obj  # copy.deepcopy(h_obj)
                 if sample in xs_dict.keys():
                     h = h * xs_dict[sample] * lumi / merged_output[sample]["sumw"]
                 else:

@@ -47,6 +47,9 @@ from BTVNanoCommissioning.workflows.BTA_ttbar_producer import (
 #     NanoProcessor as ExampleProcessor,
 # )
 
+## Shape Scalefactors Iterative Fit
+from BTVNanoCommissioning.workflows.btag_iterative_sf import BTagIterativeSFProcessor
+
 
 # FIXME - make names more systematic?
 workflows = {}
@@ -106,5 +109,8 @@ workflows["BTA"] = BTA_processor
 workflows["BTA_addPFMuons"] = partial(BTA_processor, addPFMuons=True)
 workflows["BTA_addAllTracks"] = partial(BTA_processor, addAllTracks=True)
 workflows["BTA_ttbar"] = BTA_ttbar_processor
+
+# Shape Scalefactors Iterative Fit
+workflows["btag_iterative_sf"] = BTagIterativeSFProcessor
 
 __all__ = ["workflows"]

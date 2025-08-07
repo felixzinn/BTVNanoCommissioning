@@ -152,6 +152,9 @@ elif "semilep" in args.phase:
 elif "dilep" in args.phase:
     input_txt = r"t$\bar{t}$ dileptonic"
     nj = 2
+elif "btag_iterative_sf" in args.phase:
+    input_txt = "iterative dileptonic"
+    nj=2
 if (
     "njet" in args.variable.split(",")
     or "nbjet" in args.variable.split(",")
@@ -198,6 +201,15 @@ elif "*" in args.variable:
 
 else:
     var_set = args.variable.split(",")
+
+if args.phase == "btag_iterative_sf":
+    # we need to skip these histograms, since they are high dimensional
+    var_set = set(var_set) - {
+        "btagDeepFlavB",
+        "btagPNetB",
+        "btagUParTAK4B",
+        "btagRobustParTAK4B",
+    }
 for index, discr in enumerate(var_set):
     try:
         if not isinstance(collated["mc"][discr], hist.hist.Hist):
@@ -644,3 +656,5 @@ for index, discr in enumerate(var_set):
         fig.savefig(
             f"plot/{args.phase}_{args.ext}/unc_{discr}_inclusive{scale}_{name}.png"
         )
+    
+    plt.close(fig)

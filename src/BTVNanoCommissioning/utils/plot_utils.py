@@ -72,6 +72,12 @@ sample_mergemap = {
         "DYto2L-2Jets_MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "DYJetsToLL_M-10to50_TuneCP5_13p6TeV-madgraphMLM-pythia8",
         "DYJetsToLL_M-50_TuneCP5_13p6TeV-madgraphMLM-pythia8",
+        "DYto2E_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
+        "DYto2E-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "DYto2Mu_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
+        "DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "DYto2Tau_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
+        "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
     ],
     "W+jets": [
         "WJetsToLNu_TuneCP5_13p6TeV-madgraphMLM-pythia8",
