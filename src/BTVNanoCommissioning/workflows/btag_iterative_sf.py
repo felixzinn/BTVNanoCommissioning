@@ -308,7 +308,11 @@ def fill_histograms(
                             region=region,
                             channel=channel,
                             jet_index=jet_index,
-                            **{b_tagger: jet[b_tagger][region_channel_mask]},
+                            **{
+                                b_tagger: flavor_and_regions[
+                                    f"btag_{b_tagger}_probe_jet{jet_index}"
+                                ][region_channel_mask]
+                            },
                             weight=weight[region_channel_mask],
                         )
 
@@ -593,6 +597,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 probe_jet = ak.firsts(good_jets[:, i_probe_jet : i_probe_jet + 1])
                 # get btag score of the tag jet
                 b_score_tag_jet = ak.fill_none(tag_jet[b_tagger], np.nan)
+                b_score_probe_jet = ak.fill_none(probe_jet[b_tagger], np.nan)
 
                 # cuts on jets
                 tag_jet_cut = {
@@ -616,6 +621,10 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 flavor_and_regions[f"flavor_{b_tagger}_probe_jet{i_probe_jet}"] = (
                     ak.values_astype(flavor_probe_jet[event_level_mask], int)
                 )
+
+                # btag
+                flavor_and_regions[f"btag_{b_tagger}_probe_jet{i_probe_jet}"] = (
+                    b_score_probe_jet[event_level_mask]
                 )
 
                 # cuts specific to regions and channels
