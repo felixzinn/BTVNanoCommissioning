@@ -218,8 +218,8 @@ class HistogramHelper:
             Histogram summed over all jet flavors
         """
         if self.is_data:
-            return self.histogram["nominal", 0, sum, sum, region, channel, sum, :]
-        return self.histogram["nominal", sum, sum, sum, region, channel, sum, :]
+            return self.histogram["nominal", 0, sum, sum, region, sum, :]
+        return self.histogram["nominal", sum, sum, sum, region, sum, :]
 
     def get_by_flavor(self, region: str, channel: str) -> list[hist.Hist]:
         """Get list of histograms separated by flavor.
@@ -244,7 +244,7 @@ class HistogramHelper:
                 sum,
                 sum,
                 region,
-                channel,
+                # channel,
                 sum,
                 :,
             ][sum, :]
@@ -527,22 +527,25 @@ def main():
         )
 
         for variable in VARIABLES:
-            try:
-                mc_histogram = collated["mc"][variable]
-                data_histogram = collated["data"][variable]
-            except KeyError:
-                logger.warning(
-                    f"Variable {variable} not found in the histograms.",
-                )
-                continue
-
             logger.info(f"Plotting histograms for variable: {variable}")
+            for channel in ("ee", "emu", "mumu", "incl"):
+                key = f"{variable}_{channel}"
+                try:
+                    mc_histogram = collated["mc"][key]
+                    data_histogram = collated["data"][key]
+                except KeyError:
+                    logger.warning(
+                        f"Key {key} not found in the histograms.",
+                    )
+                    continue
 
-            mc_histogram = HistogramHelper(mc_histogram, is_data=False)
-            data_histogram = HistogramHelper(data_histogram, is_data=True)
+                logger.debug(f"Plotting histograms for {variable=}, {channel=}")
 
-            for channel in mc_histogram.axes["channel"]:
-                save_path = Path("plot", channel)
+                mc_histogram = HistogramHelper(mc_histogram, is_data=False)
+                data_histogram = HistogramHelper(data_histogram, is_data=True)
+
+                # for channel in mc_histogram.axes["channel"]:
+                save_path = Path("plot", variable, channel)
                 # Create all subdirectories at once
                 (save_path / "lin").mkdir(parents=True, exist_ok=True)
                 (save_path / "log").mkdir(parents=True, exist_ok=True)
