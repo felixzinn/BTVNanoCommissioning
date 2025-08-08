@@ -190,6 +190,9 @@ HISTOGRAM_AXES = {
     ),
 }
 
+# CHANNELS = {"ee", "mumu", "emu", "incl"}
+CHANNELS = {"incl"}  # all four channels to large for 60 GB of RAM
+
 
 def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str]):
     histograms = {
@@ -290,7 +293,7 @@ def fill_histograms(
             # for now only 1 jet, no swapping
             for jet_index in (1,):
                 for region in ("HF", "LF"):
-                    for channel in ("ee", "mumu", "emu", "incl"):
+                    for channel in CHANNELS:
                         # get the mask for the current region and channel
                         region_channel_mask = flavor_and_regions[
                             f"{region}_{channel}_{b_tagger}_probe_jet{jet_index}"
@@ -548,11 +551,14 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         )
         ch_incl = reduce_or(ch_ee, ch_mumu, ch_emu)
         channels = {
-            "ee": ch_ee,
-            "mumu": ch_mumu,
-            "emu": ch_emu,
+            # "ee": ch_ee,
+            # "mumu": ch_mumu,
+            # "emu": ch_emu,
             "incl": ch_incl,
         }
+        assert set(CHANNELS) == set(channels.keys()), (
+            "channels in histogram definition and channel masks do not match"
+        )
 
         common_masks = [
             met_filter_mask,
