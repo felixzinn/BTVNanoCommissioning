@@ -291,7 +291,7 @@ def fill_histograms(
 
         for b_tagger in b_taggers:
             # for now only 1 jet, no swapping
-            for jet_index in (1,):
+            for jet_index in (1, 0):
                 for region in ("HF", "LF"):
                     for channel in CHANNELS:
                         # get the mask for the current region and channel
@@ -597,8 +597,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         # ==============
 
         flavor_and_regions = {}
-        for i_tag_jet, i_probe_jet in [(0, 1)]:
-            # for now, no swapping
+        for i_tag_jet, i_probe_jet in [(0, 1), (1, 0)]:
             # for swapping, use: [(0, 1), (1, 0)]
             for b_tagger, config in self.b_tagger_config.items():
                 tag_jet = ak.firsts(good_jets[:, i_tag_jet : i_tag_jet + 1])
