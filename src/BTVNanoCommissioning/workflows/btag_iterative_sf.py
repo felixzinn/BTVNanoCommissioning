@@ -597,7 +597,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 # cuts on jets
                 tag_jet_cut = {
                     "HF": b_score_tag_jet >= config["medium"],
-                    "LF": b_score_tag_jet >= config["loose"],
+                    "LF": b_score_tag_jet <= config["loose"],
                 }
 
                 # flavor of probe jet
