@@ -478,10 +478,17 @@ def main():
     )
 
     output = load_histograms()
+    # pop data from output to avoid memory usage in scaling
+    data_output = output.pop("data", None)
+    data_output.pop("xsection", None)  # remove xsection if exists
+    output["mc"].pop("xsection", None)  # remove xsection if exists
 
     # scale the histograms by the luminosity
     logger.debug("Scaling histograms by luminosity...")
     output = scaleSumW(output, lumi)
+    for key in list(data_output.keys()):
+        output[key] = data_output.pop(key)  # add data histograms back to output
+
     mergemap = {
         "data": [m for m in output.keys() if "Run" in m],
         "mc": [m for m in output.keys() if "Run" not in m],

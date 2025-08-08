@@ -36,8 +36,6 @@ def scaleSumW(output, lumi):
             )
     merged_output = merge_output(output)
 
-    # btag_iterative_sf exports xsection as well, skip this key
-    merged_output.pop("xsection", None)
     for sample, accu in merged_output.items():
         scaled[sample] = {}
         for key, h_obj in accu.items():
