@@ -27,7 +27,7 @@ from matplotlib import rc_context
 # ================
 # setup logging
 # ================
-logger = logging.getLogger(__file__)
+logger = logging.getLogger(__name__)
 
 
 # ================
@@ -428,18 +428,18 @@ def load_histograms():
         "data": Path("hists_data/hists_data.coffea"),
     }
 
-    logger.debug("Checking for histogram files...")
+    logger.debug("Checking for histogram files")
     missing_files = [path for path in files.values() if not path.exists()]
     if missing_files:
         logger.error(f"Missing histogram files: {missing_files}")
         raise FileNotFoundError(f"Missing histogram files: {missing_files}")
 
-    logger.debug("Loading histogram files...")
+    logger.info("Loading histogram files")
     result = {}
     for name, path in files.items():
         logger.debug(f"Loading {name} histograms from {path}")
         result[name] = load(path)
-        logger.info(f"Successfully loaded {name} histograms")
+        logger.debug(f"Successfully loaded {name} histograms")
 
     logger.info("All histogram files loaded successfully")
     return result
@@ -451,6 +451,7 @@ def setup_logging(log_level: str):
         raise ValueError("Invalid log level: %s" % log_level)
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     logger.setLevel(numeric_level)
 
@@ -483,21 +484,23 @@ def main():
     data_output.pop("xsection", None)  # remove xsection if exists
     output["mc"].pop("xsection", None)  # remove xsection if exists
 
+    logging.info("Preparing histograms for plotting")
     # scale the histograms by the luminosity
-    logger.debug("Scaling histograms by luminosity...")
+    logger.debug("Scaling histograms by luminosity")
     output = scaleSumW(output, lumi)
+    logger.debug("Adding data back to output")
     for key in list(data_output.keys()):
         output[key] = data_output.pop(key)  # add data histograms back to output
 
+    # merge datasets
+    logger.debug("Collating datasets")
     mergemap = {
         "data": [m for m in output.keys() if "Run" in m],
         "mc": [m for m in output.keys() if "Run" not in m],
     }
-    # group by datasets
-    logger.debug("Collating datasets...")
     collated = collate(output, mergemap)
 
-    logger.info("Preparation of histograms complete. Start plotting.")
+    logger.info("Start plotting")
 
     # ================
     # plot histograms
