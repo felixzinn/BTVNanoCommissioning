@@ -300,9 +300,9 @@ def fill_histograms(
                         # fill the histogram
                         histograms[b_tagger].fill(
                             syst=syst,
-                            flav=flavor_and_regions[f"flavor_probe_jet{jet_index}"][
-                                region_channel_mask
-                            ],
+                            flav=flavor_and_regions[
+                                f"flavor_{b_tagger}_probe_jet{jet_index}"
+                            ][region_channel_mask],
                             eta=jet.eta[region_channel_mask],
                             pt=jet.pt[region_channel_mask],
                             region=region,
@@ -613,8 +613,9 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 # b_flavor = flavor_probe_jet == 5
                 # c_flavor = flavor_probe_jet == 4
                 # light_flavor = (flavor_probe_jet < 4) | (flavor_probe_jet > 5)
-                flavor_and_regions[f"flavor_probe_jet{i_probe_jet}"] = ak.values_astype(
-                    flavor_probe_jet[event_level_mask], int
+                flavor_and_regions[f"flavor_{b_tagger}_probe_jet{i_probe_jet}"] = (
+                    ak.values_astype(flavor_probe_jet[event_level_mask], int)
+                )
                 )
 
                 # cuts specific to regions and channels
