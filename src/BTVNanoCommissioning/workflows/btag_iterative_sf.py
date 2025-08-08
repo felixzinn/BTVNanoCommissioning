@@ -214,17 +214,19 @@ def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str
             )
 
     for b_tagger in b_taggers:
-        histograms[b_tagger] = hist.Hist(
-            HISTOGRAM_AXES["sys_axis"],
-            HISTOGRAM_AXES["flav_axis"],
-            HISTOGRAM_AXES["eta_axis"],
-            HISTOGRAM_AXES["pt_axis"],
-            HISTOGRAM_AXES["region_axis"],
-            HISTOGRAM_AXES["channel_axis"],
-            hist.axis.IntCategory([0, 1], name="jet_index", label="Jet index"),
-            HISTOGRAM_AXES[f"{b_tagger}_axis"],
-            hist.storage.Weight(),
-        )
+        for channel in CHANNELS:
+            histograms[f"{b_tagger}_{channel}"] = hist.Hist(
+                HISTOGRAM_AXES["sys_axis"],
+                HISTOGRAM_AXES["flav_axis"],
+                HISTOGRAM_AXES["eta_axis"],
+                HISTOGRAM_AXES["pt_axis"],
+                HISTOGRAM_AXES["region_axis"],
+                # HISTOGRAM_AXES["channel_axis"],
+                hist.axis.IntCategory([0, 1], name="jet_index", label="Jet index"),
+                HISTOGRAM_AXES[f"{b_tagger}_axis"],
+                hist.storage.Weight(),
+                label=b_tagger,
+            )
 
     return histograms
 
@@ -298,7 +300,7 @@ def fill_histograms(
                         jet = pruned_events.SelJet[:, jet_index]
 
                         # fill the histogram
-                        histograms[b_tagger].fill(
+                        histograms[f"{b_tagger}_{channel}"].fill(
                             syst=syst,
                             flav=flavor_and_regions[
                                 f"flavor_{b_tagger}_probe_jet{jet_index}"
@@ -306,7 +308,7 @@ def fill_histograms(
                             eta=jet.eta[region_channel_mask],
                             pt=jet.pt[region_channel_mask],
                             region=region,
-                            channel=channel,
+                            # channel=channel,
                             jet_index=jet_index,
                             **{
                                 b_tagger: flavor_and_regions[
