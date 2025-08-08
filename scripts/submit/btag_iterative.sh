@@ -122,7 +122,6 @@ if [ "$TEST_MODE" = true ]; then
     LIMIT_DATA=1
     MAX_MC="$TEST_MAX"
     MAX_DATA="$TEST_MAX"
-    EXECUTOR="iterative"
     SCALEOUT=32
     VERSION="${VERSION}_test"
 fi
@@ -130,8 +129,11 @@ fi
 # if executor is futures use this
 if [ "$EXECUTOR" = "futures" ]; then
     echo "Using futures executor"
-    # Add any futures-specific configuration here
     EXECUTOR="futures"
+fi
+if [ "$EXECUTOR" = "iterative" ]; then
+    echo "Using iterative executor"
+    EXECUTOR="iterative"
 fi
 
 echo "Configuration:"
