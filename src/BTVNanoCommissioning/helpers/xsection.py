@@ -20,30 +20,32 @@ Example of a cross section dictionary:
 ```
 """
 
+dy_xsection = 6346.0 / 3
+dy_xsection_10to50 = 19317.5 / 3
 xsection = [
     {
         "process_name": "DYto2Mu_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
-        "cross_section": "19317.5",
+        "cross_section": str(dy_xsection_10to50),
     },
     {
         "process_name": "DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
-        "cross_section": "6346.0",
+        "cross_section": str(dy_xsection),
     },
     {
         "process_name": "DYto2E_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
-        "cross_section": "19317.5",
+        "cross_section": str(dy_xsection_10to50),
     },
     {
         "process_name": "DYto2E-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
-        "cross_section": "6346.0",
+        "cross_section": str(dy_xsection),
     },
     {
         "process_name": "DYto2Tau_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
-        "cross_section": "19317.5",
+        "cross_section": str(dy_xsection_10to50),
     },
     {
         "process_name": "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
-        "cross_section": "6346.0",
+        "cross_section": str(dy_xsection),
     },
     {
         "process_name": "DYJetsToLL_M-10to50_TuneCP5_13p6TeV-madgraphMLM-pythia8",
