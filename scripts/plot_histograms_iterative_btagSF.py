@@ -141,7 +141,7 @@ def configure_plot(
     ax.set_ylim(bottom=max(1e-1, ax.get_ylim()[0]))
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Events")
-    ax.legend()
+    ax.legend(loc="upper center", ncols=3)
 
     if ax_ratio is not None:
         ax.set_xlabel(None)
@@ -152,11 +152,23 @@ def configure_plot(
     fig.tight_layout()
 
 
+def add_space_on_top(ax: Axes, log: bool = False):
+    down, up = ax.get_ylim()
+    if log:
+        up_log = math.log10(up)
+        delta = up_log - math.log10(down)
+        new_upper = 10 ** (up_log + 0.2 * delta)
+    else:
+        new_upper = up + 0.2 * (up - down)
+    ax.set_ylim(top=new_upper)
+
+
 def save_figure(
     fig: Figure,
     ax: Axes,
     save_path: os.PathLike,
     filename: str,
+    plot_format: str = "png",
 ) -> None:
     """Save the figure in both linear and log scale.
 
@@ -169,14 +181,16 @@ def save_figure(
         save_path: Directory path where to save the plots
         filename: Base filename (without extension)
     """
-    fig.savefig(save_path / "lin" / f"{filename}.png", dpi=300)
+    add_space_on_top(ax, log=False)
+    fig.savefig(save_path / "lin" / f"{filename}.{plot_format}", dpi=300)
     try:
         ax.set_yscale("log")
+        add_space_on_top(ax, log=True)
     except ValueError as e:
         # log scale might fail if negative entries (due to weights)
         logging.warning(f"Failed to save log scale plot: {e}")
     else:
-        fig.savefig(save_path / "log" / f"{filename}.png", dpi=300)
+        fig.savefig(save_path / "log" / f"{filename}.{plot_format}", dpi=300)
     finally:
         plt.close(fig)
 
