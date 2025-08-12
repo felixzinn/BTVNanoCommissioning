@@ -169,6 +169,8 @@ elif "QCD" == args.phase:
     input_txt = input_txt + ""
 elif "ttdilep_sf" == args.phase:
     input_txt = input_txt + " (e$\mu$)"
+elif "btag_iterative_sf" in args.phase:
+    pass
 else:
     input_txt = input_txt + " ($\mu$)"
 if "ctag" in args.phase and "DY" not in args.phase:
@@ -217,6 +219,13 @@ for index, discr in enumerate(var_set):
     except:
         print(f"{discr} not found. Variable must be in", collated["mc"].keys())
         sys.exit(1)
+    if (
+        "btag_iterative_sf" in args.phase
+        and "region" in collated["mc"][discr].axes.name
+    ):
+        # iterative workflow exports multi-dimensional histogram
+        # with custom plotting script
+        continue
     ## remove empty
     if (
         discr not in collated["mc"].keys()
