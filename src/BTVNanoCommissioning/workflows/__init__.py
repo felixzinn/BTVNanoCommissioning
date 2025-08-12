@@ -112,5 +112,6 @@ workflows["BTA_ttbar"] = BTA_ttbar_processor
 
 # Shape Scalefactors Iterative Fit
 workflows["btag_iterative_sf"] = BTagIterativeSFProcessor
+workflows["btag_iterative_sf_mumu"] = partial(BTagIterativeSFProcessor, channel_selector="mumu")
 
 __all__ = ["workflows"]

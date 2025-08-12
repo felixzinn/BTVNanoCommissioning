@@ -75,7 +75,7 @@ def min_dr(particles):
 
 def nano_object_overlap(toclean, cleanagainst, dr=0.4):
     """Get Overlap mask between two collections of particles.
-    Check if cleanagainst objects are within a certain delta R
+    Check if cleanagainst objects are outside of a certain delta R
     of toclean objects.
     """
     return ak.all(toclean.metric_table(cleanagainst) > dr, axis=-1)
@@ -147,6 +147,8 @@ def z_diamond(jets, met, leptons, dilep_mass):
 
 
 # define histograms to be filled
+# CHANNELS = {"ee", "mumu", "emu", "incl"}
+CHANNELS = {"incl"}  # all four channels to large for 60 GB of RAM
 HISTOGRAM_AXES = {
     "flav_axis": hist.axis.IntCategory([0, 1, 4, 5, 6], name="flav", label="Flavor"),
     "sys_axis": hist.axis.StrCategory([], name="syst", growth=True),
@@ -156,10 +158,7 @@ HISTOGRAM_AXES = {
     "eta_axis": hist.axis.Regular(25, -2.5, 2.5, name="eta", label=" $\eta$"),
     "phi_axis": hist.axis.Regular(30, -3, 3, name="phi", label="$\phi$"),
     "region_axis": hist.axis.StrCategory(["HF", "LF"], name="region", label="Region"),
-    "channel_axis": hist.axis.StrCategory(
-        ["ee", "mumu", "emu", "incl"], name="channel", label="Channel"
-    ),
-    # NOTE: ["ee", "mumu", "emu", "incl"] for channels requires a lot of memory
+    "channel_axis": hist.axis.StrCategory(CHANNELS, name="channel", label="Channel"),
     "btagDeepFlavB_axis": hist.axis.Regular(
         100,
         0,
@@ -190,11 +189,8 @@ HISTOGRAM_AXES = {
     ),
 }
 
-# CHANNELS = {"ee", "mumu", "emu", "incl"}
-CHANNELS = {"incl"}  # all four channels to large for 60 GB of RAM
 
-
-def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str]):
+def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str], channels: Iterable[str]):
     histograms = {
         "dr_jets": hist.Hist(
             HISTOGRAM_AXES["sys_axis"],
@@ -217,7 +213,7 @@ def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str
             )
 
     for b_tagger in b_taggers:
-        for channel in CHANNELS:
+        for channel in channels:
             histograms[f"{b_tagger}_{channel}"] = hist.Hist(
                 HISTOGRAM_AXES["sys_axis"],
                 HISTOGRAM_AXES["flav_axis"],
@@ -240,6 +236,7 @@ def fill_histograms(
     flavor_and_regions: dict[str, ak.Array],
     b_taggers: Iterable[str],
     particle_objects: dict[str, list],
+    channels: Iterable[str],
     weights,
     systematics: Iterable,
     isSyst: bool,
@@ -293,7 +290,7 @@ def fill_histograms(
             # for now only 1 jet, no swapping
             for jet_index in (1, 0):
                 for region in ("HF", "LF"):
-                    for channel in CHANNELS:
+                    for channel in channels:
                         # get the mask for the current region and channel
                         region_channel_mask = flavor_and_regions[
                             f"{region}_{channel}_{b_tagger}_probe_jet{jet_index}"
@@ -339,6 +336,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         isArray: bool = False,
         noHist: bool = False,
         chunksize: int = 75000,
+        channel_selector: str = "incl",
     ):
         self._year = year
         self._campaign = campaign
@@ -347,6 +345,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         self.isArray = isArray
         self.noHist = noHist
         self.chunksize = chunksize
+        self._channel = channel_selector
 
         # lumi mask
         self.lumiMask = load_lumi(self._campaign)
@@ -379,9 +378,19 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         }
 
         self.particle_objects = {
-            "SelJet#0": ["pt", "eta", "phi", "mass", *self.b_tagger_config.keys()],
-            "SelJet#1": ["pt", "eta", "phi", "mass", *self.b_tagger_config.keys()],
-            "MET": ["pt", "phi"],
+            "SelJet#0": [
+                "pt",
+                "eta",
+                "phi",
+                "mass",
+            ],  # , *self.b_tagger_config.keys()],
+            "SelJet#1": [
+                "pt",
+                "eta",
+                "phi",
+                "mass",
+            ],  # , *self.b_tagger_config.keys()],
+            "PuppiMET": ["pt", "phi"],
             "dilep": ["pt", "eta", "phi", "mass"],
             "SelMuon": ["pt", "eta", "phi"],
             "SelElectron": ["pt", "eta", "phi"],
@@ -421,7 +430,6 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             output = dump_lumi(events[lumi_mask], output)
 
         # trigger
-        channels = ("ee", "emu", "mumu")
         triggers = {
             "ee": [
                 "Ele23_Ele12_CaloIdL_TrackIdL_IsoVL",
@@ -440,7 +448,8 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         }
 
         trigger_masks = {
-            channel: HLT_helper(events, triggers[channel]) for channel in channels
+            channel: HLT_helper(events, trigger_paths)
+            for channel, trigger_paths in triggers.items()
         }
 
         ### object selection ###
@@ -498,7 +507,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         )
 
         # MET
-        met = events.MET
+        met = events.PuppiMET
         met_pt_cut = met.pt > 30.0
 
         # jets
@@ -551,14 +560,14 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         )
         ch_incl = reduce_or(ch_ee, ch_mumu, ch_emu)
         channels = {
-            # "ee": ch_ee,
-            # "mumu": ch_mumu,
-            # "emu": ch_emu,
+            "ee": ch_ee,
+            "mumu": ch_mumu,
+            "emu": ch_emu,
             "incl": ch_incl,
         }
-        assert set(CHANNELS) == set(channels.keys()), (
-            "channels in histogram definition and channel masks do not match"
-        )
+        # assert set(CHANNELS) == set(channels.keys()), (
+        #     "channels in histogram definition and channel masks do not match"
+        # )
 
         common_masks = [
             met_filter_mask,
@@ -567,7 +576,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         ]
 
         ### define pruned_events ###
-        event_level_mask = reduce_and(*common_masks, ch_incl)
+        event_level_mask = reduce_and(*common_masks, channels[self._channel])
         pruned_events = events[event_level_mask]
 
         # skip empty events
@@ -635,23 +644,24 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 )
 
                 # cuts specific to regions and channels
-                for channel, channel_mask in channels.items():
-                    flavor_and_regions[
-                        f"HF_{channel}_{b_tagger}_probe_jet{i_probe_jet}"
-                    ] = reduce_and(
-                        *common_masks,
-                        channel_mask,
-                        tag_jet_cut["HF"],
-                        lepton_region_cut_HF,
-                    )[event_level_mask]
-                    flavor_and_regions[
-                        f"LF_{channel}_{b_tagger}_probe_jet{i_probe_jet}"
-                    ] = reduce_and(
-                        *common_masks,
-                        channel_mask,
-                        tag_jet_cut["LF"],
-                        lepton_region_cut_LF,
-                    )[event_level_mask]
+                # for channel, channel_mask in channels.items():
+                channel, channel_mask = self._channel, channels[self._channel]
+                flavor_and_regions[
+                    f"HF_{channel}_{b_tagger}_probe_jet{i_probe_jet}"
+                ] = reduce_and(
+                    *common_masks,
+                    channel_mask,
+                    tag_jet_cut["HF"],
+                    lepton_region_cut_HF,
+                )[event_level_mask]
+                flavor_and_regions[
+                    f"LF_{channel}_{b_tagger}_probe_jet{i_probe_jet}"
+                ] = reduce_and(
+                    *common_masks,
+                    channel_mask,
+                    tag_jet_cut["LF"],
+                    lepton_region_cut_LF,
+                )[event_level_mask]
 
         # ==============
         # weights
@@ -676,6 +686,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             histograms = define_histograms(
                 particle_objects=self.particle_objects,
                 b_taggers=self.b_tagger_config.keys(),
+                channels=[self._channel]
             )
             histograms = fill_histograms(
                 histograms=histograms,
@@ -683,6 +694,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 flavor_and_regions=flavor_and_regions,
                 b_taggers=self.b_tagger_config.keys(),
                 particle_objects=self.particle_objects,
+                channels=[self._channel],
                 weights=weights,
                 systematics=systematics,
                 isSyst=self.isSyst,

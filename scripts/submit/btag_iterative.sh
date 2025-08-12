@@ -3,6 +3,7 @@
 
 # Default values
 WORKFLOW="btag_iterative_sf"
+CHANNEL=""
 LIMIT_MC=""
 LIMIT_DATA=""
 MAX_MC=""
@@ -25,6 +26,7 @@ OPTIONS:
     -c CAMPAIGN      Campaign name
     -y YEAR         Year
     -w WORKFLOW     Workflow name (default: $WORKFLOW)
+    -p CHANNEL      Channel selector for workflow (default: )
     -v VERSION      Output Version
     -m LIMIT        Limit for MC processing
     -d LIMIT        Limit for data processing
@@ -43,7 +45,7 @@ EOF
 }
 
 # Parse command line options
-while getopts ":c:y:w:v:m:d:e:n:i:t:oh" option; do
+while getopts ":c:y:w:v:m:d:e:n:i:t:p:oh" option; do
     case $option in
         c)
             CAMPAIGN="$OPTARG"
@@ -53,6 +55,8 @@ while getopts ":c:y:w:v:m:d:e:n:i:t:oh" option; do
             ;;
         w)
             WORKFLOW="$OPTARG"
+            ;;
+        p)  CHANNEL="$OPTARG"
             ;;
         v)
             VERSION="$OPTARG"
@@ -140,6 +144,7 @@ echo "Configuration:"
 echo "  Campaign: $CAMPAIGN"
 echo "  Year: $YEAR"
 echo "  Workflow: $WORKFLOW"
+echo "  Channel: $CHANNEL"
 echo "  Version: $VERSION"
 echo "  Limit MC: $LIMIT_MC"
 echo "  Limit Data: $LIMIT_DATA"
@@ -150,12 +155,17 @@ echo "  Scaleout: $SCALEOUT"
 echo "  IsSyst: $ISSYST"
 echo "  Overwrite: $OVERWRITE"
 
-OUTPUTDIR="/net/data_cms3a-1/fzinn/BTV/btag_sf/nobackup/${CAMPAIGN}/${WORKFLOW}/${VERSION}"
+WORKFLOW_CHANNEL="${WORKFLOW}"
+if [[ "${CHANNEL}" != "" ]]; then
+    WORKFLOW_CHANNEL="${WORKFLOW}_${CHANNEL}"
+fi
+
+OUTPUTDIR="/net/data_cms3a-1/fzinn/BTV/btag_sf/nobackup/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
 
 # execution
 python runner.py \
     --json "metadata/${CAMPAIGN}/data_${CAMPAIGN}_${YEAR}_${WORKFLOW}.json" \
-    --workflow "$WORKFLOW" \
+    --workflow "${WORKFLOW_CHANNEL}" \
     --campaign "$CAMPAIGN" \
     --year "$YEAR" \
     --chunk "$CHUNKSIZE" \
@@ -171,7 +181,7 @@ python runner.py \
 
 python runner.py \
     --json "metadata/${CAMPAIGN}/MC_${CAMPAIGN}_${YEAR}_${WORKFLOW}.json" \
-    --workflow "$WORKFLOW" \
+    --workflow "${WORKFLOW_CHANNEL}" \
     --campaign "$CAMPAIGN" \
     --year "$YEAR" \
     --chunk "$CHUNKSIZE" \
