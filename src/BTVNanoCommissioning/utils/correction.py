@@ -1214,6 +1214,7 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
 ### Lepton SFs
 def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
     allele = ele if ele.ndim > 1 else ak.singletons(ele)
+    allele = ak.pad_none(allele, ele.ndim)
 
     for sf in correct_map["EGM_cfg"].keys():
         ## Only apply SFs for lepton pass HLT filter
@@ -1226,7 +1227,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
             ele = allele[:, nele]
             ele_eta = ak.fill_none(ele.eta, -2.5)
             ele_pt = ak.fill_none(ele.pt, 20)
-            mask = ele.pt > 20.0
+            ele_phi = ak.fill_none(ele.phi, 0.0)
             masknone = ak.is_none(ele.pt)
             sfs_alle, sfs_alle_up, sfs_alle_down = (
                 np.ones_like(allele[:, 0].pt),
@@ -1238,10 +1239,14 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                 ## Reco SF -splitted pT
                 if "Reco" in sf:
                     ## phi is used in Summer23
-                    ele_pt = np.clip(ele.pt, 20.1, 74.9)
-                    ele_pt_low = np.where(ele.pt >= 20.0, 19.9, ele.pt)
-                    ele_pt_high = np.clip(ele.pt, 75.0, 500.0)
-                    if "Summer23" in correct_map["campaign"]:
+                    ele_pt = np.clip(ele_pt, 20.1, 74.9)
+                    ele_pt_low = np.where(ele_pt >= 20.0, 19.9, ele_pt)
+                    ele_pt_high = np.clip(ele_pt, 75.0, 500.0)
+                    if correct_map["campaign"] in [
+                        "Summer23",
+                        "Summer23BPix",
+                        "Summer24",
+                    ]:
                         sfs_low = np.where(
                             (ele.pt <= 20.0) & (~masknone),
                             correct_map["EGM"][sf.split(" ")[2]].evaluate(
@@ -1250,7 +1255,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                 "RecoBelow20",
                                 ele_eta,
                                 ele_pt_low,
-                                ele.phi,
+                                ele_phi,
                             ),
                             1.0,
                         )
@@ -1262,7 +1267,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                 "RecoAbove75",
                                 ele_eta,
                                 ele_pt_high,
-                                ele.phi,
+                                ele_phi,
                             ),
                             sfs_low,
                         )
@@ -1274,7 +1279,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                 "Reco20to75",
                                 ele_eta,
                                 ele_pt,
-                                ele.phi,
+                                ele_phi,
                             ),
                             sfs_high,
                         )
@@ -1289,7 +1294,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "RecoBelow20",
                                     ele_eta,
                                     ele_pt_low,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 0.0,
                             )
@@ -1301,7 +1306,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "RecoBelow20",
                                     ele_eta,
                                     ele_pt_low,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 0.0,
                             )
@@ -1313,7 +1318,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "RecoAbove75",
                                     ele_eta,
                                     ele_pt_high,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 sfs_up_low,
                             )
@@ -1325,7 +1330,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "RecoAbove75",
                                     ele_eta,
                                     ele_pt_high,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 sfs_down_low,
                             )
@@ -1337,7 +1342,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "Reco20to75",
                                     ele_eta,
                                     ele_pt,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 sfs_up_high,
                             )
@@ -1349,7 +1354,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     "Reco20to75",
                                     ele_eta,
                                     ele_pt,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                                 sfs_down_high,
                             )
@@ -1464,7 +1469,11 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                             ), np.where(masknone, 1.0, sfs_down)
                 ## Other files
                 else:
-                    if "Summer23" in correct_map["campaign"]:
+                    if correct_map["campaign"] in [
+                        "Summer23",
+                        "Summer23BPix",
+                        "Summer24",
+                    ]:
                         sfs = np.where(
                             masknone,
                             1.0,
@@ -1474,7 +1483,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                 correct_map["EGM_cfg"][sf],
                                 ele_eta,
                                 ele_pt,
-                                ele.phi,
+                                ele_phi,
                             ),
                         )
 
@@ -1488,7 +1497,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     correct_map["EGM_cfg"][sf],
                                     ele_eta,
                                     ele_pt,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                             )
                             sfs_down = np.where(
@@ -1500,7 +1509,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                                     correct_map["EGM_cfg"][sf],
                                     ele_eta,
                                     ele_pt,
-                                    ele.phi,
+                                    ele_phi,
                                 ),
                             )
                     else:
@@ -1596,6 +1605,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
 
 def muSFs(mu, correct_map, weights, syst=False, isHLT=False):
     allmu = mu if mu.ndim > 1 else ak.singletons(mu)
+    allmu = ak.pad_none(allmu, mu.ndim)
     for sf in correct_map["MUO_cfg"].keys():
         ## Only apply SFs for lepton pass HLT filter
         if not isHLT and "HLT" in sf:
@@ -1612,9 +1622,8 @@ def muSFs(mu, correct_map, weights, syst=False, isHLT=False):
             mu = allmu[:, nmu]
             masknone = ak.is_none(mu.pt)
 
-            mu_pt = np.clip(mu.pt, 15.0, 199.9)
-            mu_eta = np.clip(np.abs(mu.eta), 0.0, 2.4)
-            mask = mu_pt > 30
+            mu_pt = np.clip(ak.fill_none(mu.pt, 0.0), 15.0, 199.9)
+            mu_eta = np.clip(np.abs(ak.fill_none(mu.eta, 0.0)), 0.0, 2.4)
             sfs = 1.0
             if "correctionlib" in str(type(correct_map["MUO"])):
                 sfs = np.where(
