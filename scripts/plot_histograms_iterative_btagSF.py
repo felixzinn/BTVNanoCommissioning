@@ -60,6 +60,12 @@ COLORS = {
     "l": "#964a8b",
 }
 COLOR_LIST = [COLORS[flav] for flav in FLAVOR_LABELS.keys()]
+CHANNEL_LABELS = {
+    "mumu": r"$\mu\mu$",
+    "ee": r"$ee$",
+    "emu": r"$e\mu$",
+    "incl": "Inclusive",
+}
 
 
 # ========================
@@ -148,7 +154,7 @@ def configure_plot(
         ax_ratio.set_ylabel("Data/MC")
         set_yaxis_limit_ratio(ax_ratio)
 
-    fig.suptitle(f"{region} region, {channel} channel")
+    fig.suptitle(f"{region} region, {CHANNEL_LABELS[channel]} channel")
     fig.tight_layout()
 
 
@@ -221,7 +227,7 @@ class HistogramHelper:
         self.axes = histogram.axes
         self.label = histogram.label
 
-    def get_summed(self, region: str, channel: str) -> hist.Hist:
+    def get_summed(self, region: str, channel: str, jet_index: sum) -> hist.Hist:
         """Get histogram summed over all flavors.
 
         Args:
@@ -231,11 +237,17 @@ class HistogramHelper:
         Returns:
             Histogram summed over all jet flavors
         """
-        if self.is_data:
-            return self.histogram["nominal", 0, sum, sum, region, sum, :]
-        return self.histogram["nominal", sum, sum, sum, region, sum, :]
+        # if self.is_data:
+        #     return self.histogram["nominal", 0, sum, sum, region, sum, :]
+        if "channel" in self.histogram.axes.name:
+            return self.histogram[
+                "nominal", sum, sum, sum, region, channel, jet_index, :
+            ]
+        return self.histogram["nominal", sum, sum, sum, region, jet_index, :]
 
-    def get_by_flavor(self, region: str, channel: str) -> list[hist.Hist]:
+    def get_by_flavor(
+        self, region: str, channel: str, jet_index=sum
+    ) -> list[hist.Hist]:
         """Get list of histograms separated by flavor.
 
         Args:
@@ -251,6 +263,20 @@ class HistogramHelper:
         if self.is_data:
             raise ValueError("Cannot separate data by flavor")
 
+        if "channel" in self.histogram.axes.name:
+            return [
+                self.histogram[
+                    "nominal",
+                    list(self._flav_axis.index(flavor)),
+                    sum,
+                    sum,
+                    region,
+                    channel,
+                    jet_index,
+                    :,
+                ][sum, :]
+                for flavor in FLAVOR_LABELS.values()
+            ]
         return [
             self.histogram[
                 "nominal",
@@ -259,13 +285,15 @@ class HistogramHelper:
                 sum,
                 region,
                 # channel,
-                sum,
+                jet_index,
                 :,
             ][sum, :]
             for flavor in FLAVOR_LABELS.values()
         ]
 
-    def plot_error_band(self, ax: Axes, region: str, channel: str) -> None:
+    def plot_error_band(
+        self, ax: Axes, region: str, channel: str, jet_index=sum
+    ) -> None:
         """Plot MC error band on the given axes.
 
         Args:
@@ -278,13 +306,16 @@ class HistogramHelper:
         """
         if self.is_data:
             raise ValueError("Cannot plot error band for data")
-        MCerrorband(self.get_summed(region=region, channel=channel), ax=ax)
+        MCerrorband(
+            self.get_summed(region=region, channel=channel, jet_index=jet_index), ax=ax
+        )
 
     def plot_histogram(
         self,
         ax: Axes,
         region: str,
         channel: str,
+        jet_index=sum,
         split_flavor: bool = False,
         stack: bool = True,
     ) -> None:
@@ -299,7 +330,7 @@ class HistogramHelper:
         """
         if self.is_data:
             mplhep.histplot(
-                self.get_summed(region=region, channel=channel),
+                self.get_summed(region=region, channel=channel, jet_index=jet_index),
                 label="Data",
                 histtype="errorbar",
                 color="black",
@@ -309,7 +340,9 @@ class HistogramHelper:
         else:
             if split_flavor:
                 mplhep.histplot(
-                    self.get_by_flavor(region=region, channel=channel),
+                    self.get_by_flavor(
+                        region=region, channel=channel, jet_index=jet_index
+                    ),
                     label=list(FLAVOR_LABELS.keys()),
                     stack=stack,
                     histtype="fill" if stack else "step",
@@ -319,7 +352,9 @@ class HistogramHelper:
                 )
             else:
                 mplhep.histplot(
-                    self.get_summed(region=region, channel=channel),
+                    self.get_summed(
+                        region=region, channel=channel, jet_index=jet_index
+                    ),
                     label="MC",
                     histtype="fill",
                     yerr=True,
@@ -337,6 +372,7 @@ def plot_data_mc_histograms(
     com: float,
     lumi_label: str,
     split_flavor: bool = False,
+    jet_index=sum,
 ):
     """Plot data vs MC comparison with ratio plot.
 
@@ -358,20 +394,36 @@ def plot_data_mc_histograms(
 
         if split_flavor:
             mc_histogram.plot_histogram(
-                ax=ax, region=region, channel=channel, split_flavor=True
+                ax=ax,
+                region=region,
+                channel=channel,
+                split_flavor=True,
+                jet_index=jet_index,
             )
         else:
             mc_histogram.plot_histogram(
-                ax=ax, region=region, channel=channel, split_flavor=False
+                ax=ax,
+                region=region,
+                channel=channel,
+                split_flavor=False,
+                jet_index=jet_index,
             )
 
-        data_histogram.plot_histogram(ax=ax, region=region, channel=channel)
-        mc_histogram.plot_error_band(region=region, channel=channel, ax=ax)
+        data_histogram.plot_histogram(
+            ax=ax, region=region, channel=channel, jet_index=jet_index
+        )
+        mc_histogram.plot_error_band(
+            region=region, channel=channel, ax=ax, jet_index=jet_index
+        )
 
         # plot ratio
         ax_ratio = plotratio(
-            data_histogram.get_summed(region=region, channel=channel),
-            mc_histogram.get_summed(region=region, channel=channel),
+            data_histogram.get_summed(
+                region=region, channel=channel, jet_index=jet_index
+            ),
+            mc_histogram.get_summed(
+                region=region, channel=channel, jet_index=jet_index
+            ),
             ax=ax_ratio,
         )
 
@@ -382,6 +434,8 @@ def plot_data_mc_histograms(
             filename = f"{region}_histograms_stacked"
         else:
             filename = f"{region}_histograms_summed"
+        if jet_index != sum:
+            filename = f"jet{jet_index}_{filename}"
 
         save_figure(
             fig=fig,
@@ -588,6 +642,20 @@ def main():
 
                     # MC separately doesn't need data
                     plot_MC_histograms_separately(**common_args)
+
+                    # plot jets separated
+                    for jet_index in (0, 1):
+                        common_args["jet_index"] = jet_index
+                        plot_data_mc_histograms(
+                            **common_args,
+                            data_histogram=data_histogram,
+                            split_flavor=False,
+                        )
+                        plot_data_mc_histograms(
+                            **common_args,
+                            data_histogram=data_histogram,
+                            split_flavor=True,
+                        )
 
 
 if __name__ == "__main__":
