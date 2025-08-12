@@ -20,8 +20,12 @@ Example of a cross section dictionary:
 ```
 """
 
-dy_xsection = 6346.0 / 3
+# computed with XSecAnalyzer
+dy_xsection = 6594.0 / 3
+# from DYJetsToLL_M-10to50_TuneCP5_13p6TeV-madgraphMLM-pythia8 dataset further down
 dy_xsection_10to50 = 19317.5 / 3
+# XSDB for DAS=WtoLNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8
+wjets_xsection = 67400 / 3
 xsection = [
     {
         "process_name": "DYto2Mu_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
@@ -46,6 +50,18 @@ xsection = [
     {
         "process_name": "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "cross_section": str(dy_xsection),
+    },
+    {
+        "process_name": "WtoENu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "cross_section": str(wjets_xsection),
+    },
+    {
+        "process_name": "WtoMuNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "cross_section": str(wjets_xsection),
+    },
+    {
+        "process_name": "WtoTauNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "cross_section": str(wjets_xsection),
     },
     {
         "process_name": "DYJetsToLL_M-10to50_TuneCP5_13p6TeV-madgraphMLM-pythia8",

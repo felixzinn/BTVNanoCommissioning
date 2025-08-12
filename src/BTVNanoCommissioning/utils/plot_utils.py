@@ -54,7 +54,10 @@ sample_mergemap = {
     "VV": [
         "WW_TuneCP5_13p6TeV-pythia8",
         "WZ_TuneCP5_13p6TeV-pythia8",
-        "ZZ_TuneCP5_13p6TeV-pythia8"
+        "ZZ_TuneCP5_13p6TeV-pythia8",
+        "WW_TuneCP5_13p6TeV_pythia8",
+        "WZ_TuneCP5_13p6TeV_pythia8",
+        "ZZ_TuneCP5_13p6TeV_pythia8",
         # decay
         "ZZto2L2Q_TuneCP5_13p6TeV_powheg-pythia8",
         "ZZto2Nu2Q_TuneCP5_13p6TeV_powheg-pythia8",
@@ -86,6 +89,9 @@ sample_mergemap = {
         "WtoLNu-4Jets_1J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_2J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_3J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "WtoENu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoMuNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoTauNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
     ],
     # QCD
     "QCD": [
