@@ -155,17 +155,18 @@ def configure_plot(
         set_yaxis_limit_ratio(ax_ratio)
 
     fig.suptitle(f"{region} region, {CHANNEL_LABELS[channel]} channel")
-    fig.tight_layout()
+    fig.tight_layout(pad=0.75)
 
 
-def add_space_on_top(ax: Axes, log: bool = False):
+def add_space_on_top(ax: Axes, log: bool = False, fraction: float = 0.2) -> None:
     down, up = ax.get_ylim()
     if log:
         up_log = math.log10(up)
-        delta = up_log - math.log10(down)
-        new_upper = 10 ** (up_log + 0.2 * delta)
+        down_log = math.log10(down)
+        delta = up_log - down_log
+        new_upper = 10 ** (down_log + 1 / (1 - fraction) * delta)  # (up_log + fraction * delta)
     else:
-        new_upper = up + 0.2 * (up - down)
+        new_upper = down + 1 / (1 - fraction) * (up - down)  # up + fraction * (up - down)
     ax.set_ylim(top=new_upper)
 
 
@@ -552,7 +553,7 @@ def main():
     data_output.pop("xsection", None)  # remove xsection if exists
     output["mc"].pop("xsection", None)  # remove xsection if exists
 
-    logging.info("Preparing histograms for plotting")
+    logger.info("Preparing histograms for plotting")
     # scale the histograms by the luminosity
     logger.debug("Scaling histograms by luminosity")
     output = scaleSumW(output, lumi)
@@ -566,6 +567,7 @@ def main():
         "data": [m for m in output.keys() if "Run" in m],
         "mc": [m for m in output.keys() if "Run" not in m],
     }
+    logger.debug(f"Collating with mergemap: {mergemap}")
     collated = collate(output, mergemap)
 
     logger.info("Start plotting")
