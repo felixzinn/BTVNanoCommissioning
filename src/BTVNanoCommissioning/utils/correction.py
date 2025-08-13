@@ -160,17 +160,26 @@ def load_SF(year, campaign, syst=False):
                 if "ele" in e and "_json" not in e
             }
             ## Muon
+            muon_json_dir = config[campaign].get(
+                "MUO_json",
+                f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/MUO/{year}_{campaign}",
+            )
             if os.path.exists(
-                f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/MUO/{year}_{campaign}"
+                muon_json_dir
             ):
                 correct_map["MUO"] = correctionlib.CorrectionSet.from_file(
-                    f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/MUO/{year}_{campaign}/muon_Z.json.gz"
+                    f"{muon_json_dir}/muon_Z.json.gz"
                 )
+            ## Electron
+            electron_json_dir = config[campaign].get(
+                "EGM_json",
+                f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/{year}_{campaign}",
+            )
             if os.path.exists(
-                f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/{year}_{campaign}"
+                electron_json_dir
             ):
                 correct_map["EGM"] = correctionlib.CorrectionSet.from_file(
-                    f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/EGM/{year}_{campaign}/electron.json.gz"
+                    f"{electron_json_dir}/electron.json.gz"
                 )
             if any(
                 np.char.find(np.array(list(config[campaign]["LSF"].keys())), "mu_json")
