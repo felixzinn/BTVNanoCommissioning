@@ -8,7 +8,8 @@ LIMIT_MC=""
 LIMIT_DATA=""
 MAX_MC=""
 MAX_DATA=""
-EXECUTOR="parsl/condor"
+EXECUTOR_DEFAULT="parsl/condor"
+EXECUTOR=""
 SCALEOUT=200
 ISSYST="False"
 TEST_MODE=false
@@ -120,6 +121,8 @@ if [ -z "$YEAR" ]; then
 fi
 
 # Apply test mode settings if enabled
+
+# Set executor logic
 if [ "$TEST_MODE" = true ]; then
     echo "Running in test mode with max $TEST_MAX files"
     LIMIT_MC=1
@@ -128,16 +131,15 @@ if [ "$TEST_MODE" = true ]; then
     MAX_DATA="$TEST_MAX"
     SCALEOUT=32
     VERSION="${VERSION}_test"
+    # If executor not set by -e, use iterative
+    if [ -z "$EXECUTOR" ]; then
+        EXECUTOR="iterative"
+    fi
 fi
 
-# if executor is futures use this
-if [ "$EXECUTOR" = "futures" ]; then
-    echo "Using futures executor"
-    EXECUTOR="futures"
-fi
-if [ "$EXECUTOR" = "iterative" ]; then
-    echo "Using iterative executor"
-    EXECUTOR="iterative"
+# If not set by test mode or -e, use default
+if [ -z "$EXECUTOR" ]; then
+    EXECUTOR="$EXECUTOR_DEFAULT"
 fi
 
 echo "Configuration:"
