@@ -1,5 +1,4 @@
 #!/bin/bash
-# filepath: /home/home1/institut_3a/zinn/analyses/BTV/BTVNanoCommissioning/scripts/submit/btag_iterative.sh
 
 # Default values
 WORKFLOW="btag_iterative_sf"
@@ -35,6 +34,7 @@ OPTIONS:
     -n SCALEOUT     Scaleout value (default: $SCALEOUT)
     -i ISSYST       System flag (default: $ISSYST)
     -t NUMBER       Enable test mode with max files limit
+    -l LUMI         Luminosity to scale plots
     -o              Enable overwrite mode
     -h              Show this help message
 
@@ -46,7 +46,7 @@ EOF
 }
 
 # Parse command line options
-while getopts ":c:y:w:v:m:d:e:n:i:t:p:oh" option; do
+while getopts ":c:y:w:v:m:d:e:n:i:t:p:l:oh" option; do
     case $option in
         c)
             CAMPAIGN="$OPTARG"
@@ -86,6 +86,9 @@ while getopts ":c:y:w:v:m:d:e:n:i:t:p:oh" option; do
                 usage
                 exit 1
             fi
+            ;;
+        l)
+            LUMI="$OPTARG"
             ;;
         o)
             OVERWRITE=true
@@ -162,7 +165,8 @@ if [[ "${CHANNEL}" != "" ]]; then
     WORKFLOW_CHANNEL="${WORKFLOW}_${CHANNEL}"
 fi
 
-OUTPUTDIR="/net/data_cms3a-1/fzinn/BTV/btag_sf/nobackup/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
+# OUTPUTDIR="/net/data_cms3a-1/fzinn/BTV/btag_sf/nobackup/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
+OUTPUTDIR="/net/data_cms3a-1/BTV/btag_sf/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
 
 # execution
 python runner.py \
@@ -200,3 +204,23 @@ for json in dy ttbar WZ singletop; do
         ${OVERWRITE:+--overwrite} \
         --splitjobs
 done
+
+basedir=$(pwd)
+cd "$OUTPUTDIR"
+python ${basedir}/scripts/plotdataMC.py \
+    -p btag_iterative_sf_mumu \
+    -v all \
+    -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+    --lumi $LUMI \
+    --log \
+    --split sample
+
+
+python ${basedir}/scripts/plotdataMC.py \
+    -p btag_iterative_sf_mumu \
+    -v all \
+    -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+    --lumi $LUMI \
+    --split sample
+
+python ${basedir}/scripts/plot_histograms_iterative_btagSF.py --lumi $LUMI --log-level info
