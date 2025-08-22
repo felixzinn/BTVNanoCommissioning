@@ -493,23 +493,30 @@ def load_histograms():
         FileNotFoundError: If any of the required histogram files are missing.
     """
     files = {
-        "mc": Path("hists_MC/hists_MC.coffea"),
-        "data": Path("hists_data/hists_data.coffea"),
+        "mc": [
+            Path(f"hists_MC_{process}/hists_MC_{process}.coffea")
+            for process in ("dy", "ttbar", "WZ", "singletop")
+        ],
+        "data": [Path("hists_data/hists_data.coffea")],
     }
 
     logger.debug("Checking for histogram files")
-    missing_files = [path for path in files.values() if not path.exists()]
+    missing_files = [
+        path for paths in files.values() for path in paths if not path.exists()
+    ]
     if missing_files:
         logger.error(f"Missing histogram files: {missing_files}")
         raise FileNotFoundError(f"Missing histogram files: {missing_files}")
 
     logger.info("Loading histogram files")
     result = {}
-    for name, path in files.items():
-        logger.debug(f"Loading {name} histograms from {path}")
-        result[name] = load(path)
-        logger.debug(f"Successfully loaded {name} histograms")
-
+    for name, paths in files.items():
+        output = {}
+        for path in paths:
+            logger.debug(f"Loading {name} histograms from {path}")
+            output |= load(path)
+            logger.debug(f"Successfully loaded {name} histograms")
+        result[name] = output
     logger.info("All histogram files loaded successfully")
     return result
 

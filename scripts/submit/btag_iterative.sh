@@ -179,20 +179,24 @@ python runner.py \
     ${LIMIT_DATA:+--limit "$LIMIT_DATA"} \
     ${MAX_DATA:+--max "$MAX_DATA"} \
     --isSyst "$ISSYST" \
-    ${OVERWRITE:+--overwrite}
+    ${OVERWRITE:+--overwrite} \
+    --splitjobs
 
-python runner.py \
-    --json "metadata/${CAMPAIGN}/MC_${CAMPAIGN}_${YEAR}_${WORKFLOW}.json" \
-    --workflow "${WORKFLOW_CHANNEL}" \
-    --campaign "$CAMPAIGN" \
-    --year "$YEAR" \
-    --chunk "$CHUNKSIZE" \
-    --outputdir "$OUTPUTDIR" \
-    --output "hists_MC.coffea" \
-    --executor "$EXECUTOR" \
-    --scaleout "$SCALEOUT" \
-    --skipbadfiles \
-    ${LIMIT_MC:+--limit "$LIMIT_MC"} \
-    ${MAX_MC:+--max "$MAX_MC"} \
-    --isSyst "$ISSYST" \
-    ${OVERWRITE:+--overwrite}
+for json in dy ttbar WZ singletop; do
+    python runner.py \
+        --json "metadata/${CAMPAIGN}/btag_iterative_sf/${json}.json" \
+        --workflow "${WORKFLOW_CHANNEL}" \
+        --campaign "$CAMPAIGN" \
+        --year "$YEAR" \
+        --chunk "$CHUNKSIZE" \
+        --outputdir "$OUTPUTDIR" \
+        --output "hists_MC_${json}.coffea" \
+        --executor "$EXECUTOR" \
+        --scaleout "$SCALEOUT" \
+        --skipbadfiles \
+        ${LIMIT_MC:+--limit "$LIMIT_MC"} \
+        ${MAX_MC:+--max "$MAX_MC"} \
+        --isSyst "$ISSYST" \
+        ${OVERWRITE:+--overwrite} \
+        --splitjobs
+done
