@@ -164,9 +164,13 @@ def add_space_on_top(ax: Axes, log: bool = False, fraction: float = 0.2) -> None
         up_log = math.log10(up)
         down_log = math.log10(down)
         delta = up_log - down_log
-        new_upper = 10 ** (down_log + 1 / (1 - fraction) * delta)  # (up_log + fraction * delta)
+        new_upper = 10 ** (
+            down_log + 1 / (1 - fraction) * delta
+        )  # (up_log + fraction * delta)
     else:
-        new_upper = down + 1 / (1 - fraction) * (up - down)  # up + fraction * (up - down)
+        new_upper = down + 1 / (1 - fraction) * (
+            up - down
+        )  # up + fraction * (up - down)
     ax.set_ylim(top=new_upper)
 
 
