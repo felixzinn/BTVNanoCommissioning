@@ -161,9 +161,17 @@ HISTOGRAM_AXES = {
     "flav_axis": hist.axis.IntCategory([0, 1, 4, 5, 6], name="flav", label="Flavor"),
     "sys_axis": hist.axis.StrCategory([], name="syst", growth=True),
     "dr_axis": hist.axis.Regular(20, 0, 8, name="dr", label="$\Delta$R"),
-    "pt_axis": hist.axis.Regular(60, 0, 300, name="pt", label=" $p_{T}$ [GeV]"),
-    "mass_axis": hist.axis.Regular(50, 0, 300, name="mass", label=" $p_{T}$ [GeV]"),
-    "eta_axis": hist.axis.Regular(25, -2.5, 2.5, name="eta", label=" $\eta$"),
+    "pt_axis": hist.axis.Regular(
+        60, 0, 300, name="pt", label=r"$p_{\mathrm{T}}$ / GeV"
+    ),
+    "pt_btag_axis": hist.axis.Variable(
+        [*range(0, 200, 10), 200, np.inf], name="pt", label=r"$p_{\mathrm{T}}$ / GeV"
+    ),
+    "mass_axis": hist.axis.Regular(50, 0, 300, name="mass", label="$m$ / GeV"),
+    "eta_axis": hist.axis.Regular(25, -2.5, 2.5, name="eta", label="$\eta$"),
+    "abs_eta_axis": hist.axis.Variable(
+        [0.0, 0.8, 1.6, 2.5], name="eta", label="|$\eta$|"
+    ),
     "phi_axis": hist.axis.Regular(30, -3, 3, name="phi", label="$\phi$"),
     "region_axis": hist.axis.StrCategory(["HF", "LF"], name="region", label="Region"),
     "channel_axis": hist.axis.StrCategory(CHANNELS, name="channel", label="Channel"),
@@ -198,7 +206,9 @@ HISTOGRAM_AXES = {
 }
 
 
-def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str], channels: Iterable[str]):
+def define_histograms(
+    particle_objects: dict[str, list], b_taggers: Iterable[str], channels: Iterable[str]
+):
     logger.debug("defining histograms")
     histograms = {
         "dr_jets": hist.Hist(
@@ -226,8 +236,8 @@ def define_histograms(particle_objects: dict[str, list], b_taggers: Iterable[str
             histograms[f"{b_tagger}_{channel}"] = hist.Hist(
                 HISTOGRAM_AXES["sys_axis"],
                 HISTOGRAM_AXES["flav_axis"],
-                HISTOGRAM_AXES["eta_axis"],
-                HISTOGRAM_AXES["pt_axis"],
+                HISTOGRAM_AXES["abs_eta_axis"],
+                HISTOGRAM_AXES["pt_btag_axis"],
                 HISTOGRAM_AXES["region_axis"],
                 # HISTOGRAM_AXES["channel_axis"],
                 hist.axis.IntCategory([0, 1], name="jet_index", label="Jet index"),
@@ -261,40 +271,44 @@ def fill_histograms(
             else weights.weight(modifier=syst)
         )
 
-        # kinematic distributions
-        for obj, attrs in particle_objects.items():
-            for attr in attrs:
-                # if # in obj, use the index to access the correct object
-                parts = obj.split("#", 1)  # maxsplit=1 ensures at most 2 parts
-                _obj = parts[0]
-                if len(parts) > 1:
-                    index = int(parts[1])
-                    attr_value = getattr(pruned_events[_obj][:, index], attr)
-                else:
-                    attr_value = getattr(pruned_events[_obj], attr)
+        if syst == "nominal":
+            # fill only nominal
+            # kinematic distributions
+            for obj, attrs in particle_objects.items():
+                for attr in attrs:
+                    # if # in obj, use the index to access the correct object
+                    parts = obj.split("#", 1)  # maxsplit=1 ensures at most 2 parts
+                    _obj = parts[0]
+                    if len(parts) > 1:
+                        index = int(parts[1])
+                        attr_value = getattr(pruned_events[_obj][:, index], attr)
+                    else:
+                        attr_value = getattr(pruned_events[_obj], attr)
 
-                # flatten array if more than one dimension
-                weight_flat = weight
-                if attr_value.ndim > 1:
-                    weight_flat, attr_value = broadcast_and_flatten(weight, attr_value)
+                    # flatten array if more than one dimension
+                    weight_flat = weight
+                    if attr_value.ndim > 1:
+                        weight_flat, attr_value = broadcast_and_flatten(
+                            weight, attr_value
+                        )
 
-                histograms[f"{obj}_{attr}"].fill(
-                    **{attr: attr_value, "weight": weight_flat, "syst": syst},
-                )
+                    histograms[f"{obj}_{attr}"].fill(
+                        **{attr: attr_value, "weight": weight_flat, "syst": syst},
+                    )
 
-        # delta R between jets
-        histograms["dr_jets"].fill(
-            syst=syst,
-            weight=weight,
-            dr=pruned_events["SelJet"][:, 0].delta_r(pruned_events["SelJet"][:, 1]),
-        )
+            # delta R between jets
+            histograms["dr_jets"].fill(
+                syst=syst,
+                weight=weight,
+                dr=pruned_events["SelJet"][:, 0].delta_r(pruned_events["SelJet"][:, 1]),
+            )
 
-        # number of jets
-        histograms["njet"].fill(
-            njet=pruned_events.njet,
-            weight=weight,
-            syst=syst,
-        )
+            # number of jets
+            histograms["njet"].fill(
+                njet=pruned_events.njet,
+                weight=weight,
+                syst=syst,
+            )
 
         logger.debug("filling b-tag discriminant histograms for syst %s", syst)
         for b_tagger in b_taggers:
@@ -315,7 +329,7 @@ def fill_histograms(
                             flav=flavor_and_regions[
                                 f"flavor_{b_tagger}_probe_jet{jet_index}"
                             ][region_channel_mask],
-                            eta=jet.eta[region_channel_mask],
+                            eta=np.abs(jet.eta[region_channel_mask]),
                             pt=jet.pt[region_channel_mask],
                             region=region,
                             # channel=channel,
@@ -388,22 +402,22 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         }
 
         self.particle_objects = {
-            "SelJet#0": [
-                "pt",
-                "eta",
-                "phi",
-                "mass",
-            ],  # , *self.b_tagger_config.keys()],
-            "SelJet#1": [
-                "pt",
-                "eta",
-                "phi",
-                "mass",
-            ],  # , *self.b_tagger_config.keys()],
+            # "SelJet#0": [
+            #     "pt",
+            #     "eta",
+            #     "phi",
+            #     "mass",
+            # ],  # , *self.b_tagger_config.keys()],
+            # "SelJet#1": [
+            #     "pt",
+            #     "eta",
+            #     "phi",
+            #     "mass",
+            # ],  # , *self.b_tagger_config.keys()],
             "PuppiMET": ["pt", "phi"],
             "dilep": ["pt", "eta", "phi", "mass"],
             "SelMuon": ["pt", "eta", "phi"],
-            "SelElectron": ["pt", "eta", "phi"],
+            # "SelElectron": ["pt", "eta", "phi"],
         }
 
     def process(self, events):
@@ -703,7 +717,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             histograms = define_histograms(
                 particle_objects=self.particle_objects,
                 b_taggers=self.b_tagger_config.keys(),
-                channels=[self._channel]
+                channels=[self._channel],
             )
             histograms = fill_histograms(
                 histograms=histograms,
