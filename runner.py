@@ -129,8 +129,8 @@ def config_parser(parser):
         "--isSyst",
         default="False",
         type=str,
-        choices=["False", "all", "weight_only", "JERC_split", "JP_MC"],
-        help="Run with systematics, all, weights_only(no JERC uncertainties included),JERC_split, None",
+        choices=["False", "all", "weight_only", "JERC_full", "JERC_reduced", "JERC_total", "JP_MC"],
+        help="Run with systematics (default: %(default)s), weights_only(no JERC uncertainties included)",
     )
     parser.add_argument("--isArray", action="store_true", help="Output root files")
     parser.add_argument(
@@ -234,6 +234,11 @@ def scaleout_parser(parser):
         help=f"(Specific for dask/lxplus file splitting, default: %(default)s)\n   Format: $dict_index_start,$file_index_start,$dict_index_stop,$file_index_stop. Stop indices are optional. $dict_index refers to the index, splitted $dict_index and $file_index with ','"
         "$dict_index refers to the sample dictionary of the samples json file. $file_index refers to the N-th batch of files per dask-worker, with its size being defined by the option --index. The job will start (stop) submission from (with) the corresponding indices.",
     )
+    parser.add_argument(
+        "--splitjobs",
+        action="store_true",
+        help="Split processing and merging"
+    )
     return parser
 
 
@@ -312,7 +317,7 @@ if __name__ == "__main__":
             ]
     # check file dict size - avoid large memory consumption for local machine
     filesize = np.sum(np.array([len(sample_dict[key]) for key in sample_dict.keys()]))
-    splitjobs = False
+    splitjobs = args.splitjobs
     if filesize > 200 and "lxplus" in args.executor:
         splitjobs = True
 
