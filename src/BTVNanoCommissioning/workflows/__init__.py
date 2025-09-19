@@ -111,7 +111,9 @@ workflows["BTA_addAllTracks"] = partial(BTA_processor, addAllTracks=True)
 workflows["BTA_ttbar"] = BTA_ttbar_processor
 
 # Shape Scalefactors Iterative Fit
-workflows["btag_iterative_sf"] = BTagIterativeSFProcessor
+workflows["btag_iterative_sf"] = partial(BTagIterativeSFProcessor, channel_selector="all")
 workflows["btag_iterative_sf_mumu"] = partial(BTagIterativeSFProcessor, channel_selector="mumu")
+workflows["btag_iterative_sf_ee"] = partial(BTagIterativeSFProcessor, channel_selector="ee")
+workflows["btag_iterative_sf_emu"] = partial(BTagIterativeSFProcessor, channel_selector="emu")
 
 __all__ = ["workflows"]
