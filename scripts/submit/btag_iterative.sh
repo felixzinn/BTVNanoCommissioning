@@ -14,7 +14,8 @@ ISSYST="False"
 TEST_MODE=false
 TEST_MAX=""  # Add this new variable
 OVERWRITE=""
-CHUNKSIZE=250000
+# CHUNKSIZE=250000
+CHUNKSIZE=1000
 VERSION="no_version"
 
 # Function to display usage
@@ -23,8 +24,9 @@ usage() {
 Usage: $0 [OPTIONS]
 
 OPTIONS:
-    -c CAMPAIGN      Campaign name
+    -c CAMPAIGN     Campaign name
     -y YEAR         Year
+    -r RUN          Run period
     -w WORKFLOW     Workflow name (default: $WORKFLOW)
     -p CHANNEL      Channel selector for workflow (default: )
     -v VERSION      Output Version
@@ -46,13 +48,16 @@ EOF
 }
 
 # Parse command line options
-while getopts ":c:y:w:v:m:d:e:n:i:t:p:l:oh" option; do
+while getopts ":c:y:r:w:v:m:d:e:n:i:t:p:l:oh" option; do
     case $option in
         c)
             CAMPAIGN="$OPTARG"
             ;;
         y)
             YEAR="$OPTARG"
+            ;;
+        r)
+            RUN_PERIOD="$OPTARG"
             ;;
         w)
             WORKFLOW="$OPTARG"
@@ -123,6 +128,12 @@ if [ -z "$YEAR" ]; then
     exit 1
 fi
 
+if [ -z "$RUN_PERIOD" ]; then
+    echo "Error: Run period (-r) is required." >&2
+    usage
+    exit 1
+fi
+
 # Apply test mode settings if enabled
 
 # Set executor logic
@@ -132,7 +143,7 @@ if [ "$TEST_MODE" = true ]; then
     LIMIT_DATA=1
     MAX_MC="$TEST_MAX"
     MAX_DATA="$TEST_MAX"
-    SCALEOUT=32
+    # SCALEOUT=32
     VERSION="${VERSION}_test"
     # If executor not set by -e, use iterative
     if [ -z "$EXECUTOR" ]; then
@@ -145,9 +156,27 @@ if [ -z "$EXECUTOR" ]; then
     EXECUTOR="$EXECUTOR_DEFAULT"
 fi
 
+if [ $RUN_PERIOD = "all" ]; then
+    RUN_PERIOD=(
+        "RunC" "RunD" "RunE" "RunF" "RunG" "RunH" "RunI"
+    )
+else
+    RUN_PERIOD=("$RUN_PERIOD")
+fi
+
+# https://superuser.com/questions/461981/how-do-i-convert-a-bash-array-variable-to-a-string-delimited-with-newlines
+runs=$( IFS=$','; echo "${RUN_PERIOD[*]}" )
+output_data=""
+for run in "${RUN_PERIOD[@]}"; do
+    output_data+="hists_data_${run}/hists_data_${run}.coffea,"
+done
+output_data=${output_data%,}  # remove trailing comma
+
+
 echo "Configuration:"
 echo "  Campaign: $CAMPAIGN"
 echo "  Year: $YEAR"
+echo "  Run: $runs"
 echo "  Workflow: $WORKFLOW"
 echo "  Channel: $CHANNEL"
 echo "  Version: $VERSION"
@@ -169,23 +198,6 @@ fi
 OUTPUTDIR="/net/data_cms3a-1/BTV/btag_sf/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
 
 # execution
-python runner.py \
-    --json "metadata/${CAMPAIGN}/data_${CAMPAIGN}_${YEAR}_${WORKFLOW}.json" \
-    --workflow "${WORKFLOW_CHANNEL}" \
-    --campaign "$CAMPAIGN" \
-    --year "$YEAR" \
-    --chunk "$CHUNKSIZE" \
-    --outputdir "$OUTPUTDIR" \
-    --output "hists_data.coffea" \
-    --executor "$EXECUTOR" \
-    --scaleout "$SCALEOUT" \
-    --skipbadfiles \
-    ${LIMIT_DATA:+--limit "$LIMIT_DATA"} \
-    ${MAX_DATA:+--max "$MAX_DATA"} \
-    --isSyst "$ISSYST" \
-    ${OVERWRITE:+--overwrite} \
-    --splitjobs
-
 for json in dy ttbar WZ singletop; do
     python runner.py \
         --json "metadata/${CAMPAIGN}/btag_iterative_sf/${json}.json" \
@@ -203,24 +215,47 @@ for json in dy ttbar WZ singletop; do
         --isSyst "$ISSYST" \
         ${OVERWRITE:+--overwrite} \
         --splitjobs
+    echo
 done
 
-basedir=$(pwd)
-cd "$OUTPUTDIR"
-python ${basedir}/scripts/plotdataMC.py \
-    -p btag_iterative_sf_mumu \
-    -v all \
-    -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
-    --lumi $LUMI \
-    --log \
-    --split sample
+for run in "${RUN_PERIOD[@]}"; do
+    python runner.py \
+        --json "metadata/${CAMPAIGN}/btag_iterative_sf/data_${run}.json" \
+        --workflow "${WORKFLOW_CHANNEL}" \
+        --campaign "$CAMPAIGN" \
+        --year "$YEAR" \
+        --chunk "$CHUNKSIZE" \
+        --outputdir "$OUTPUTDIR" \
+        --output "hists_data_${run}.coffea" \
+        --executor "$EXECUTOR" \
+        --scaleout "$SCALEOUT" \
+        --skipbadfiles \
+        ${LIMIT_DATA:+--limit "$LIMIT_DATA"} \
+        ${MAX_DATA:+--max "$MAX_DATA"} \
+        --isSyst "$ISSYST" \
+        ${OVERWRITE:+--overwrite} \
+        --splitjobs
+    echo
+done
+
+if [ "$TEST_MODE" = false ]; then
+    basedir=$(pwd)
+    cd "$OUTPUTDIR"
+    python ${basedir}/scripts/plotdataMC.py \
+        -p btag_iterative_sf_mumu \
+        -v all \
+        -i ${output_data},hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+        --lumi $LUMI \
+        --log \
+        --split sample
 
 
-python ${basedir}/scripts/plotdataMC.py \
-    -p btag_iterative_sf_mumu \
-    -v all \
-    -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
-    --lumi $LUMI \
-    --split sample
+    python ${basedir}/scripts/plotdataMC.py \
+        -p btag_iterative_sf_mumu \
+        -v all \
+        -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+        --lumi $LUMI \
+        --split sample
 
-python ${basedir}/scripts/plot_histograms_iterative_btagSF.py --lumi $LUMI --log-level info
+    python ${basedir}/scripts/plot_histograms_iterative_btagSF.py --lumi $LUMI --log-level info
+fi
