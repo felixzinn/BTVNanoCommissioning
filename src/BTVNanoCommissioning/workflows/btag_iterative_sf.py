@@ -355,7 +355,6 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         self,
         year: str,
         campaign: str,
-        outdir: str = "",
         isSyst: bool = False,
         isArray: bool = False,
         noHist: bool = False,
@@ -364,7 +363,6 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
     ):
         self._year = year
         self._campaign = campaign
-        self._outdir = outdir
         self.isSyst = isSyst
         self.isArray = isArray
         self.noHist = noHist
