@@ -6,23 +6,21 @@ need to be in the directory of the histograms, i.e. contains
 
 import argparse
 import logging
-import os
-from pathlib import Path
 import math
+import os
 import warnings
+from pathlib import Path
 
-from coffea.util import load
-
-from BTVNanoCommissioning.helpers.xs_scaler import scaleSumW, collate
-from BTVNanoCommissioning.utils.plot_utils import MCerrorband, plotratio
-
-import mplhep
 import hist
 import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
+import mplhep
+from coffea.util import load
 from matplotlib import rc_context
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
+from BTVNanoCommissioning.helpers.xs_scaler import collate, scaleSumW
+from BTVNanoCommissioning.utils.plot_utils import MCerrorband, plotratio
 
 # ================
 # setup logging
@@ -52,7 +50,7 @@ parser.add_argument(
 # ==============
 # some defaults
 # ==============
-VARIABLES = {"btagDeepFlavB", "btagPNetB", "btagUParTAK4B", "btagRobustParTAK4B"}
+VARIABLES = {"btagDeepFlavB", "btagUParTAK4B", "btagRobustParTAK4B"}  # , "btagPNetB"
 FLAVOR_LABELS = {"c": [4], "b": [5], "l": [0, 1, 6]}
 COLORS = {
     "b": "#5790fc",
@@ -232,12 +230,16 @@ class HistogramHelper:
         self.axes = histogram.axes
         self.label = histogram.label
 
-    def get_summed(self, region: str, channel: str, jet_index: sum) -> hist.Hist:
+    def get_summed(
+        self, region: str, channel: str, eta_bin: sum, jet_index: sum
+    ) -> hist.Hist:
         """Get histogram summed over all flavors.
 
         Args:
             region: Physics region to select
             channel: Lepton channel to select
+            eta_bin: Eta bin to select
+            jet_index: Jet index to select (0, 1, or sum for all jets)
 
         Returns:
             Histogram summed over all jet flavors
@@ -246,18 +248,19 @@ class HistogramHelper:
         #     return self.histogram["nominal", 0, sum, sum, region, sum, :]
         if "channel" in self.histogram.axes.name:
             return self.histogram[
-                "nominal", sum, sum, sum, region, channel, jet_index, :
+                "nominal", sum, eta_bin, sum, region, channel, jet_index, :
             ]
-        return self.histogram["nominal", sum, sum, sum, region, jet_index, :]
+        return self.histogram["nominal", sum, eta_bin, sum, region, jet_index, :]
 
     def get_by_flavor(
-        self, region: str, channel: str, jet_index=sum
+        self, region: str, channel: str, jet_index=sum, eta_bin=sum
     ) -> list[hist.Hist]:
         """Get list of histograms separated by flavor.
 
         Args:
             region: Physics region to select
             channel: Lepton channel to select
+            jet_index: Jet index to select (0, 1, or sum for all jets)
 
         Returns:
             List of histograms, one for each jet flavor
@@ -273,7 +276,7 @@ class HistogramHelper:
                 self.histogram[
                     "nominal",
                     list(self._flav_axis.index(flavor)),
-                    sum,
+                    eta_bin,
                     sum,
                     region,
                     channel,
@@ -286,7 +289,7 @@ class HistogramHelper:
             self.histogram[
                 "nominal",
                 list(self._flav_axis.index(flavor)),
-                sum,
+                eta_bin,
                 sum,
                 region,
                 # channel,
@@ -297,7 +300,7 @@ class HistogramHelper:
         ]
 
     def plot_error_band(
-        self, ax: Axes, region: str, channel: str, jet_index=sum
+        self, ax: Axes, region: str, channel: str, jet_index=sum, eta_bin=sum
     ) -> None:
         """Plot MC error band on the given axes.
 
@@ -312,7 +315,10 @@ class HistogramHelper:
         if self.is_data:
             raise ValueError("Cannot plot error band for data")
         MCerrorband(
-            self.get_summed(region=region, channel=channel, jet_index=jet_index), ax=ax
+            self.get_summed(
+                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
+            ),
+            ax=ax,
         )
 
     def plot_histogram(
@@ -321,6 +327,7 @@ class HistogramHelper:
         region: str,
         channel: str,
         jet_index=sum,
+        eta_bin=sum,
         split_flavor: bool = False,
         stack: bool = True,
     ) -> None:
@@ -335,7 +342,9 @@ class HistogramHelper:
         """
         if self.is_data:
             mplhep.histplot(
-                self.get_summed(region=region, channel=channel, jet_index=jet_index),
+                self.get_summed(
+                    region=region, channel=channel, eta_bin=eta_bin, jet_index=jet_index
+                ),
                 label="Data",
                 histtype="errorbar",
                 color="black",
@@ -346,7 +355,10 @@ class HistogramHelper:
             if split_flavor:
                 mplhep.histplot(
                     self.get_by_flavor(
-                        region=region, channel=channel, jet_index=jet_index
+                        region=region,
+                        channel=channel,
+                        jet_index=jet_index,
+                        eta_bin=eta_bin,
                     ),
                     label=list(FLAVOR_LABELS.keys()),
                     stack=stack,
@@ -358,7 +370,10 @@ class HistogramHelper:
             else:
                 mplhep.histplot(
                     self.get_summed(
-                        region=region, channel=channel, jet_index=jet_index
+                        region=region,
+                        channel=channel,
+                        eta_bin=eta_bin,
+                        jet_index=jet_index,
                     ),
                     label="MC",
                     histtype="fill",
@@ -377,6 +392,7 @@ def plot_data_mc_histograms(
     com: float,
     lumi_label: str,
     split_flavor: bool = False,
+    eta_bin=sum,
     jet_index=sum,
 ):
     """Plot data vs MC comparison with ratio plot.
@@ -404,6 +420,7 @@ def plot_data_mc_histograms(
                 channel=channel,
                 split_flavor=True,
                 jet_index=jet_index,
+                eta_bin=eta_bin,
             )
         else:
             mc_histogram.plot_histogram(
@@ -412,22 +429,23 @@ def plot_data_mc_histograms(
                 channel=channel,
                 split_flavor=False,
                 jet_index=jet_index,
+                eta_bin=eta_bin,
             )
 
         data_histogram.plot_histogram(
-            ax=ax, region=region, channel=channel, jet_index=jet_index
+            ax=ax, region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
         )
         mc_histogram.plot_error_band(
-            region=region, channel=channel, ax=ax, jet_index=jet_index
+            region=region, channel=channel, ax=ax, jet_index=jet_index, eta_bin=eta_bin
         )
 
         # plot ratio
         ax_ratio = plotratio(
             data_histogram.get_summed(
-                region=region, channel=channel, jet_index=jet_index
+                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
             ),
             mc_histogram.get_summed(
-                region=region, channel=channel, jet_index=jet_index
+                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
             ),
             ax=ax_ratio,
         )
@@ -441,6 +459,8 @@ def plot_data_mc_histograms(
             filename = f"{region}_histograms_summed"
         if jet_index != sum:
             filename = f"jet{jet_index}_{filename}"
+        if eta_bin != sum:
+            filename = f"etabin{eta_bin}_{filename}"
 
         save_figure(
             fig=fig,
@@ -457,6 +477,7 @@ def plot_MC_histograms_separately(
     save_path: os.PathLike,
     com: float,
     lumi_label: str,
+    eta_bin=sum,
 ):
     """Plot MC histograms by flavor as separate lines.
 
@@ -474,16 +495,24 @@ def plot_MC_histograms_separately(
     with rc_context(mplhep.style.CMS):
         fig, (ax, _) = define_figure(com=com, lumi_label=lumi_label, ratio=False)
         mc_histogram.plot_histogram(
-            ax=ax, region=region, channel=channel, split_flavor=True, stack=False
+            ax=ax,
+            region=region,
+            channel=channel,
+            split_flavor=True,
+            stack=False,
+            eta_bin=eta_bin,
         )
         configure_plot(
             fig=fig, ax=ax, region=region, channel=channel, xlabel=mc_histogram.label
         )
+        filename = f"{region}_histograms_separate"
+        if eta_bin != sum:
+            filename = f"etabin{eta_bin}_{filename}"
         save_figure(
             fig=fig,
             ax=ax,
             save_path=save_path,
-            filename=f"{region}_histograms_separate",
+            filename=filename,
         )
 
 
@@ -501,7 +530,8 @@ def load_histograms():
             Path(f"hists_MC_{process}/hists_MC_{process}.coffea")
             for process in ("dy", "ttbar", "WZ", "singletop")
         ],
-        "data": [Path("hists_data/hists_data.coffea")],
+        # "data": [Path("hists_data/hists_data.coffea")],
+        "data": list(Path().glob("hists_data_*/hists_data_*.coffea")),
     }
 
     logger.debug("Checking for histogram files")
@@ -655,6 +685,21 @@ def main():
 
                     # MC separately doesn't need data
                     plot_MC_histograms_separately(**common_args)
+
+                    for eta_bin in range(len(mc_histogram.axes[2])):
+                        plot_data_mc_histograms(
+                            **common_args,
+                            data_histogram=data_histogram,
+                            split_flavor=False,
+                            eta_bin=eta_bin,
+                        )
+
+                        plot_data_mc_histograms(
+                            **common_args,
+                            data_histogram=data_histogram,
+                            split_flavor=True,
+                            eta_bin=eta_bin,
+                        )
 
                     # plot jets separated
                     for jet_index in (0, 1):
