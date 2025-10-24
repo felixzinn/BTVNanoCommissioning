@@ -389,11 +389,11 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                 "medium": 0.3196,
                 "tight": 0.73,
             },
-            "btagPNetB": {
-                "loose": 0.1,
-                "medium": 0.5,
-                "tight": 0.9,
-            },
+            # "btagPNetB": {
+            #     "loose": 0.1,
+            #     "medium": 0.5,
+            #     "tight": 0.9,
+            # },
             ParT_name: {
                 "loose": 0.0897,
                 "medium": 0.451,
