@@ -213,11 +213,13 @@ def define_histograms(
     histograms = {
         "dr_jets": hist.Hist(
             HISTOGRAM_AXES["sys_axis"],
+            HISTOGRAM_AXES["region_axis"],
             HISTOGRAM_AXES["dr_axis"],
             hist.storage.Weight(),
         ),
         "njet": hist.Hist(
             HISTOGRAM_AXES["sys_axis"],
+            HISTOGRAM_AXES["region_axis"],
             hist.axis.Integer(0, 10, name="njet", label="N-jets"),
             hist.storage.Weight(),
         ),
@@ -227,6 +229,7 @@ def define_histograms(
         for attr in attrs:
             histograms[f"{obj}_{attr}"] = hist.Hist(
                 HISTOGRAM_AXES["sys_axis"],
+                HISTOGRAM_AXES["region_axis"],
                 HISTOGRAM_AXES[f"{attr}_axis"],
                 hist.storage.Weight(),
             )
@@ -274,41 +277,51 @@ def fill_histograms(
         if syst == "nominal":
             # fill only nominal
             # kinematic distributions
-            for obj, attrs in particle_objects.items():
-                for attr in attrs:
-                    # if # in obj, use the index to access the correct object
-                    parts = obj.split("#", 1)  # maxsplit=1 ensures at most 2 parts
-                    _obj = parts[0]
-                    if len(parts) > 1:
-                        index = int(parts[1])
-                        attr_value = getattr(pruned_events[_obj][:, index], attr)
-                    else:
-                        attr_value = getattr(pruned_events[_obj], attr)
+            for region in ("HF", "LF"):
+                for obj, attrs in particle_objects.items():
+                    for attr in attrs:
+                        # if # in obj, use the index to access the correct object
+                        parts = obj.split("#", 1)  # maxsplit=1 ensures at most 2 parts
+                        _obj = parts[0]
+                        if len(parts) > 1:
+                            index = int(parts[1])
+                            attr_value = getattr(pruned_events[_obj][:, index], attr)
+                        else:
+                            attr_value = getattr(pruned_events[_obj], attr)
 
-                    # flatten array if more than one dimension
-                    weight_flat = weight
-                    if attr_value.ndim > 1:
-                        weight_flat, attr_value = broadcast_and_flatten(
-                            weight, attr_value
+                        # flatten array if more than one dimension
+                        weight_flat = weight
+                        if attr_value.ndim > 1:
+                            weight_flat, attr_value = broadcast_and_flatten(
+                                weight, attr_value
+                            )
+
+                        histograms[f"{obj}_{attr}"].fill(
+                            **{
+                                attr: attr_value,
+                                "weight": weight_flat,
+                                "syst": syst,
+                                "region": region,
+                            },
                         )
 
-                    histograms[f"{obj}_{attr}"].fill(
-                        **{attr: attr_value, "weight": weight_flat, "syst": syst},
-                    )
+                # delta R between jets
+                histograms["dr_jets"].fill(
+                    syst=syst,
+                    region=region,
+                    weight=weight,
+                    dr=pruned_events["SelJet"][:, 0].delta_r(
+                        pruned_events["SelJet"][:, 1]
+                    ),
+                )
 
-            # delta R between jets
-            histograms["dr_jets"].fill(
-                syst=syst,
-                weight=weight,
-                dr=pruned_events["SelJet"][:, 0].delta_r(pruned_events["SelJet"][:, 1]),
-            )
-
-            # number of jets
-            histograms["njet"].fill(
-                njet=pruned_events.njet,
-                weight=weight,
-                syst=syst,
-            )
+                # number of jets
+                histograms["njet"].fill(
+                    njet=pruned_events.njet,
+                    region=region,
+                    weight=weight,
+                    syst=syst,
+                )
 
         logger.debug("filling b-tag discriminant histograms for syst %s", syst)
         for b_tagger in b_taggers:
@@ -593,9 +606,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             # "incl": ch_incl,
         }
         if self._channel != "all":
-            channels = {
-                self._channel: channels[self._channel]
-            }
+            channels = {self._channel: channels[self._channel]}
         # assert set(CHANNELS) == set(channels.keys()), (
         #     "channels in histogram definition and channel masks do not match"
         # )
@@ -677,7 +688,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
 
                 # cuts specific to regions and channels
                 for channel, channel_mask in channels.items():
-                # channel, channel_mask = self._channel, channels[self._channel]
+                    # channel, channel_mask = self._channel, channels[self._channel]
                     flavor_and_regions[
                         f"HF_{channel}_{b_tagger}_probe_jet{i_probe_jet}"
                     ] = reduce_and(
