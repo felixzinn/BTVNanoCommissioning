@@ -170,29 +170,37 @@ def run_coffea_processor(
     # Select executor and add specific arguments
     if executor_type == "iterative":
         _exec = processor.iterative_executor
-        executor_args.update({
-            "workers": workers,
-            "xrootdtimeout": xrootdtimeout,
-        })
+        executor_args.update(
+            {
+                "workers": workers,
+                "xrootdtimeout": xrootdtimeout,
+            }
+        )
     elif executor_type == "futures":
         _exec = processor.futures_executor
-        executor_args.update({
-            "workers": workers,
-            "xrootdtimeout": xrootdtimeout,
-        })
+        executor_args.update(
+            {
+                "workers": workers,
+                "xrootdtimeout": xrootdtimeout,
+            }
+        )
     elif executor_type == "parsl":
         _exec = processor.parsl_executor
         if splitjobs:
-            executor_args.update({
-                "merging": True,
-                "merges_executors": ["merge"],
-                "jobs_executors": ["run"],
-                "config": None,
-            })
+            executor_args.update(
+                {
+                    "merging": True,
+                    "merges_executors": ["merge"],
+                    "jobs_executors": ["run"],
+                    "config": None,
+                }
+            )
         else:
-            executor_args.update({
-                "config": None,
-            })
+            executor_args.update(
+                {
+                    "config": None,
+                }
+            )
     else:
         raise ValueError(
             f"Unknown executor type: {executor_type}. "

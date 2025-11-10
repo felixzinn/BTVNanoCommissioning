@@ -16,7 +16,7 @@ from matplotlib.figure import Figure
 from BTVNanoCommissioning.utils.plot_utils import MCerrorband, plotratio
 
 # Shared plotting metadata
-VARIABLES = {"btagDeepFlavB", "btagUParTAK4B", "btagRobustParTAK4B"}
+VARIABLES = {"btagDeepFlavB", "btagUParTAK4B", "btagRobustParTAK4B", "njet"}
 FLAVOR_LABELS = {"c": [4], "b": [5], "l": [0, 1, 6]}
 COLORS = {"b": "#5790fc", "c": "#f89c20", "l": "#964a8b"}
 COLOR_LIST = [COLORS[key] for key in FLAVOR_LABELS]
@@ -39,7 +39,7 @@ def set_yaxis_limit_ratio(ax: Axes, max_upper: float = 2.0) -> None:
 
 
 def define_figure(
-    com: float, lumi_label: str, ratio: bool = True
+    com: float, lumi_label: float, ratio: bool = True
 ) -> tuple[Figure, tuple[Axes, Axes | None]]:
     """Create a CMS-styled figure optionally including a ratio subplot."""
 
@@ -72,7 +72,8 @@ def configure_plot(
 ) -> None:
     """Apply shared axis ranges, labels, title, and legend formatting."""
 
-    ax.set_xlim(0.0, 1.0)
+    if "btag" in ax.get_xlabel().lower():
+        ax.set_xlim(0.0, 1.0)
     ax.set_ylim(bottom=max(1e-1, ax.get_ylim()[0]))
     ax.set_xlabel(xlabel)
     ax.set_ylabel("Events")
@@ -130,28 +131,56 @@ class HistogramHelper:
     def __init__(self, histogram: hist.Hist, *, is_data: bool = False) -> None:
         self.histogram = histogram
         self.is_data = is_data
-        self._flav_axis = histogram.axes["flav"] if not is_data else None
         self.axes = histogram.axes
+        self.axis_names = [axis.name for axis in histogram.axes]
+        self.value_axis_name = self.axis_names[-1] if self.axis_names else None
+        self._flav_axis = (
+            histogram.axes["flav"]
+            if (not is_data and "flav" in self.axis_names)
+            else None
+        )
         self.label = histogram.label
+
+    def iter_axis_labels(self, axis_name: str):
+        """Iterate over categorical axis labels, yielding display names."""
+
+        axis = self.get_axis(axis_name)
+        if axis is None:
+            raise ValueError(f"Axis {axis_name} does not exist on this histogram")
+
+        identifiers = getattr(axis, "identifiers", None)
+        if identifiers is None:
+            raise ValueError(
+                f"Axis {axis_name} does not expose categorical identifiers"
+            )
+
+        for identifier in identifiers:
+            yield getattr(identifier, "name", identifier)
 
     def get_axis(self, axis_name: str):
         """Return the axis by name, or None if it does not exist."""
 
-        try:
+        if axis_name in self.axis_names:
             return self.axes[axis_name]
-        except KeyError:
-            return None
+        return None
+
+    def has_axis(self, axis_name: str) -> bool:
+        """Check whether the histogram exposes the requested axis."""
+
+        return axis_name in self.axis_names
 
     def get_summed(
         self, region: str, channel: str, eta_bin: Any, jet_index: Any
     ) -> hist.Hist:
         """Return the histogram summed over flavours for a given selection."""
 
-        if "channel" in self.histogram.axes.name:
-            return self.histogram[
-                "nominal", sum, eta_bin, sum, region, channel, jet_index, :
-            ]
-        return self.histogram["nominal", sum, eta_bin, sum, region, jet_index, :]
+        selection = self._build_selection(
+            region=region,
+            channel=channel,
+            eta_bin=eta_bin,
+            jet_index=jet_index,
+        )
+        return self.histogram[selection]
 
     def get_by_flavor(
         self,
@@ -165,34 +194,25 @@ class HistogramHelper:
 
         if self.is_data:
             raise ValueError("Data histograms do not carry flavour information")
+        if not self.has_axis("flav"):
+            raise ValueError("Histogram does not contain a flavour axis")
 
         flavour_indices: Iterable[Sequence[int]] = FLAVOR_LABELS.values()
-        if "channel" in self.histogram.axes.name:
-            return [
-                self.histogram[
-                    "nominal",
-                    list(self._flav_axis.index(indices)),
-                    eta_bin,
-                    sum,
-                    region,
-                    channel,
-                    jet_index,
-                    :,
-                ][sum, :]
-                for indices in flavour_indices
-            ]
-        return [
-            self.histogram[
-                "nominal",
-                list(self._flav_axis.index(indices)),
-                eta_bin,
-                sum,
-                region,
-                jet_index,
-                :,
-            ][sum, :]
-            for indices in flavour_indices
-        ]
+        results: list[hist.Hist] = []
+        for indices in flavour_indices:
+            overrides = {
+                "flav": list(self._flav_axis.index(indices)),
+                "region": region,
+                "channel": channel,
+                "eta": eta_bin,
+                "jet_index": jet_index,
+            }
+            selection = self._build_selection(**overrides)
+            hist_view = self.histogram[selection]
+            if "flav" in hist_view.axes.name:
+                hist_view = hist_view[{"flav": sum}]
+            results.append(hist_view)
+        return results
 
     def plot_error_band(
         self,
@@ -240,7 +260,7 @@ class HistogramHelper:
             )
             return
 
-        if split_flavor:
+        if split_flavor and self.has_axis("flav"):
             mplhep.histplot(
                 self.get_by_flavor(
                     region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
@@ -259,11 +279,46 @@ class HistogramHelper:
                 region=region, channel=channel, eta_bin=eta_bin, jet_index=jet_index
             ),
             label="MC",
-            histtype="fill",
+            histtype="fill" if stack else "step",
             yerr=True,
             color="#f89c20",
             ax=ax,
         )
+
+    def _build_selection(
+        self,
+        *,
+        region: Any = None,
+        channel: Any = None,
+        eta_bin: Any = None,
+        jet_index: Any = None,
+        syst: Any = None,
+        flav: Any = None,
+        **additional_overrides: Any,
+    ) -> dict[str, Any]:
+        """Create a mapping suitable for hist indexing based on axis availability."""
+
+        selection: dict[str, Any] = {}
+
+        for axis_name in self.axis_names:
+            if axis_name == "syst":
+                selection[axis_name] = syst if syst is not None else "nominal"
+            elif axis_name == "flav":
+                selection[axis_name] = flav if flav is not None else sum
+            elif axis_name == "region":
+                selection[axis_name] = region if region is not None else sum
+            elif axis_name == "channel":
+                selection[axis_name] = channel if channel is not None else sum
+            elif axis_name in {"eta", "abs_eta"}:
+                selection[axis_name] = eta_bin if eta_bin is not None else sum
+            elif axis_name in {"jet_index", "jet"}:
+                selection[axis_name] = jet_index if jet_index is not None else sum
+            elif axis_name == self.value_axis_name:
+                selection[axis_name] = additional_overrides.get(axis_name, slice(None))
+            else:
+                selection[axis_name] = additional_overrides.get(axis_name, sum)
+
+        return selection
 
 
 def plot_data_mc_histograms(
@@ -283,6 +338,9 @@ def plot_data_mc_histograms(
     """Plot a data-vs-MC comparison with an optional flavour split."""
 
     with rc_context(mplhep.style.CMS):
+        if split_flavor and not mc_histogram.has_axis("flav"):
+            return
+
         fig, (ax, ax_ratio) = define_figure(com=com, lumi_label=lumi_label)
 
         mc_histogram.plot_histogram(
@@ -358,7 +416,7 @@ def plot_MC_histograms_separately(
             channel=channel,
             jet_index=sum,
             eta_bin=eta_bin,
-            split_flavor=True,
+            split_flavor=mc_histogram.has_axis("flav"),
             stack=False,
         )
         configure_plot(

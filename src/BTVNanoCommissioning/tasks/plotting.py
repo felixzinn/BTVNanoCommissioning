@@ -2,6 +2,7 @@ import logging
 import warnings
 from pathlib import Path
 
+import hist
 import law
 import luigi
 import luigi.util
@@ -10,7 +11,6 @@ from coffea.util import load
 from BTVNanoCommissioning.helpers.xs_scaler import collate, scaleSumW
 from BTVNanoCommissioning.tasks.base import BaseTask
 from BTVNanoCommissioning.tasks.plotting_utils import (
-    VARIABLES,
     HistogramHelper,
     plot_data_mc_histograms,
     plot_MC_histograms_separately,
@@ -87,6 +87,8 @@ class PlotDataMC(BaseTask):
 @luigi.util.inherits(processingparameters)
 @luigi.util.inherits(plottingparameters)
 class PlotIterativeResults(BaseTask):
+    json = None  # json parameter not needed here
+
     def _dataset_entries(self) -> list[tuple[str, Path, str]]:
         entries: list[tuple[str, Path, str]] = []
         seen_labels: dict[str, int] = {}
@@ -126,7 +128,9 @@ class PlotIterativeResults(BaseTask):
 
     def store_parts(self) -> tuple[str, ...]:
         base_parts = super().store_parts()
-        dataset_part = "-".join(label for label, _, _ in self._dataset_entries())
+        labels = [label for label, _, _ in self._dataset_entries()]
+        labels.sort()
+        dataset_part = "-".join(labels)
         return (*base_parts, self.campaign, self.workflow, dataset_part)
 
     def output(self):
@@ -180,7 +184,7 @@ class PlotIterativeResults(BaseTask):
         plot_root = Path(self.output().path)
         plot_root.mkdir(parents=True, exist_ok=True)
 
-        lumi_label = f"{self.lumi / 1000:.1f} fb^-1" if self.lumi else ""
+        lumi_label = self.lumi / 1000
 
         with warnings.catch_warnings():
             warnings.filterwarnings(
@@ -195,16 +199,31 @@ class PlotIterativeResults(BaseTask):
                 message=".*List indexing selection is experimental.*",
             )
 
-            for variable in VARIABLES:
-                for channel in ("ee", "emu", "mumu", "incl"):
-                    key = f"{variable}_{channel}"
-                    try:
-                        mc_hist = collated["mc"][key]
-                        data_hist = collated["data"][key]
-                    except KeyError:
-                        logger.debug("Skipping missing histogram key %s", key)
-                        continue
+            keys = [
+                key
+                for key, item in collated["mc"].items()
+                if isinstance(item, hist.Hist)
+            ]
+            for variable in keys:
+                CHANNELS = (
+                    ("ee", "emu", "mumu", "incl") if "btag" in variable else ("incl",)
+                )
+                for channel in CHANNELS:
+                    if "btag" in variable:
+                        if not variable.endswith(f"_{channel}"):
+                            continue
+                        variable = variable.replace(f"_{channel}", "")
+                    print(variable, channel)
+                    key = f"{variable}_{channel}" if "btag" in variable else variable
+                    # try:
+                    #     mc_hist = collated["mc"][key]
+                    #     data_hist = collated["data"][key]
+                    # except KeyError:
+                    #     logger.debug("Skipping missing histogram key %s", key)
+                    #     continue
 
+                    mc_hist = collated["mc"][key]
+                    data_hist = collated["data"][key]
                     mc_helper = HistogramHelper(mc_hist, is_data=False)
                     data_helper = HistogramHelper(data_hist, is_data=True)
 
@@ -224,28 +243,12 @@ class PlotIterativeResults(BaseTask):
                             "lumi_label": lumi_label,
                             "plot_format": self.plot_format,
                         }
+                        if "eta" in variable:
+                            common["eta_bin"] = slice(0, mc_helper.get_axis("eta").size)
 
                         plot_data_mc_histograms(**common, split_flavor=False)
-                        plot_data_mc_histograms(**common, split_flavor=True)
-                        plot_MC_histograms_separately(
-                            mc_helper,
-                            region,
-                            channel,
-                            save_path,
-                            self.com,
-                            lumi_label,
-                            eta_bin=sum,
-                            plot_format=self.plot_format,
-                        )
-
-                        eta_axis = mc_helper.get_axis("eta")
-                        for eta_bin in range(len(eta_axis)):
-                            plot_data_mc_histograms(
-                                **common, split_flavor=False, eta_bin=eta_bin
-                            )
-                            plot_data_mc_histograms(
-                                **common, split_flavor=True, eta_bin=eta_bin
-                            )
+                        if "flav" in mc_helper.axis_names:
+                            plot_data_mc_histograms(**common, split_flavor=True)
                             plot_MC_histograms_separately(
                                 mc_helper,
                                 region,
@@ -253,19 +256,58 @@ class PlotIterativeResults(BaseTask):
                                 save_path,
                                 self.com,
                                 lumi_label,
-                                eta_bin=eta_bin,
+                                eta_bin=sum,
                                 plot_format=self.plot_format,
                             )
 
-                        jet_axis = mc_helper.get_axis("jet_index")
-                        for jet_index in range(len(jet_axis)):
-                            plot_data_mc_histograms(
-                                **common,
-                                split_flavor=False,
-                                jet_index=jet_index,
-                            )
-                            plot_data_mc_histograms(
-                                **common, split_flavor=True, jet_index=jet_index
-                            )
+                        if (
+                            "btag" in variable
+                            and (eta_axis := mc_helper.get_axis("eta")) is not None
+                        ):
+                            for eta_bin in range(len(eta_axis)):
+                                plot_data_mc_histograms(
+                                    **common, split_flavor=False, eta_bin=eta_bin
+                                )
+                                plot_data_mc_histograms(
+                                    **common, split_flavor=True, eta_bin=eta_bin
+                                )
+                                plot_MC_histograms_separately(
+                                    mc_helper,
+                                    region,
+                                    channel,
+                                    save_path,
+                                    self.com,
+                                    lumi_label,
+                                    eta_bin=eta_bin,
+                                    plot_format=self.plot_format,
+                                )
+
+                        if (jet_axis := mc_helper.get_axis("jet_index")) is not None:
+                            for jet_index in range(len(jet_axis)):
+                                plot_data_mc_histograms(
+                                    **common,
+                                    split_flavor=False,
+                                    jet_index=jet_index,
+                                )
+                                plot_data_mc_histograms(
+                                    **common, split_flavor=True, jet_index=jet_index
+                                )
 
         self.output().touch()
+
+
+@luigi.util.inherits(plottingparameters)
+@luigi.util.inherits(processingparameters)
+class PlotAllChannels(law.WrapperTask, BaseTask):
+    """
+    Wrapper task to plot all channels.
+    """
+
+    json = None  # json parameter not needed here
+    channels = ("ee", "mumu", "emu")
+
+    def requires(self):
+        return [
+            PlotIterativeResults.req(self, workflow=f"btag_iterative_sf_{channel}")
+            for channel in self.channels
+        ]

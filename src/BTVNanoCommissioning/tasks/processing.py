@@ -1,4 +1,3 @@
-import json
 import os
 
 import law
@@ -229,6 +228,8 @@ class ProcessDatasets(BaseTask):
         if self.limit is not None:
             for key, sample in samples.items():
                 ret[key] = sample[: self.limit]
+        else:
+            ret = samples
         return ret
 
     def run(self):
@@ -279,15 +280,20 @@ class ProcessDatasets(BaseTask):
             parsl.load(htex_config)
 
             # Run the job
-            output = run_coffea_processor(
-                samples=samples,
-                processor_instance=processor_instance,
-                executor_type="parsl",
-                skipbadfiles=self.skipbadfiles,
-                chunksize=self.chunksize,
-                maxchunks=self.max,
-                splitjobs=self.splitjobs,
-            )
+            try:
+                output = run_coffea_processor(
+                    samples=samples,
+                    processor_instance=processor_instance,
+                    executor_type="parsl",
+                    skipbadfiles=self.skipbadfiles,
+                    chunksize=self.chunksize,
+                    maxchunks=self.max,
+                    splitjobs=self.splitjobs,
+                )
+            except Exception as e:
+                raise e
+            finally:
+                parsl.clear()
 
         else:
             raise NotImplementedError(f"Executor {self.executor} not supported")
