@@ -60,7 +60,7 @@ class datasetparameters(luigi.Config):
         description="Black list for sites",
     )
 
-    limit = luigi.IntParameter(
+    limit_json = luigi.IntParameter(
         default=None,
         description="Limit numbers of file to create json",
     )
@@ -144,7 +144,7 @@ class FetchDatasets(BaseTask):
             return None if value == law.NO_STR else value
 
         # Create a namespace with all parameters mapped to match argparse names
-        args = SimpleNamespace(
+        namespace = SimpleNamespace(
             input=convert_no_str(self.inp),
             output=self.out,
             xrd=convert_no_str(self.xrd),
@@ -154,7 +154,7 @@ class FetchDatasets(BaseTask):
             testfile=self.testfile,
             whitelist_sites=convert_no_str(self.whitelist_sites),
             blacklist_sites=convert_no_str(self.blacklist_sites),
-            limit=self.limit,
+            limit=self.limit_json,
             redirector=self.redirector,
             ncpus=self.ncpus,
             skipvalidation=self.skipvalidation,
@@ -163,6 +163,14 @@ class FetchDatasets(BaseTask):
             campaign=self.campaign,
             year=self.year,
         )
+
+        args = []
+        for k, v in namespace.__dict__.items():
+            if v is not None:
+                if isinstance(v, bool) and v:
+                    args.append(f"--{k}")
+                elif not isinstance(v, bool):
+                    args.extend([f"--{k}", str(v)])
 
         return args
 
@@ -179,13 +187,23 @@ class FetchDatasets(BaseTask):
         fetch_script = current_file.parent.parent.parent.parent / "scripts" / "fetch.py"
 
         # Load the fetch module dynamically
-        spec = importlib.util.spec_from_file_location("fetch", fetch_script)
-        fetch_module = importlib.util.module_from_spec(spec)
-        sys.modules["fetch"] = fetch_module
-        spec.loader.exec_module(fetch_module)
+        # spec = importlib.util.spec_from_file_location("fetch", fetch_script)
+        # fetch_module = importlib.util.module_from_spec(spec)
+        # sys.modules["fetch"] = fetch_module
+        # spec.loader.exec_module(fetch_module)
+        import subprocess
 
         # Create args namespace that mimics argparse.Namespace
         args = self._create_args_namespace()
 
         # Call the main function from fetch.py
-        fetch_module.main(args)
+        # fetch.main(args)
+
+        cmd = ["python", str(fetch_script), *args]
+        print(
+            "Running command:",
+            " ".join(cmd),
+            "in directory",
+            fetch_script.parent.parent,
+        )
+        subprocess.run(cmd, cwd=fetch_script.parent.parent)

@@ -133,7 +133,13 @@ class ProcessDatasets(BaseTask):
             self.max = 1
 
     def requires(self):
-        return FetchDatasets.req(self, out=self.json)
+        return FetchDatasets.req(
+            self,
+            out=self.json,
+            inp=os.path.join(
+                "metadata", self.campaign, self.json.replace(".json", ".txt")
+            ),
+        )
 
     def store_parts(self):
         return super().store_parts() + (self.campaign, self.workflow)
