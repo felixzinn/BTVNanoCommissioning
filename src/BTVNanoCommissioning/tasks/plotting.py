@@ -167,9 +167,8 @@ class PlotIterativeResults(BaseTask):
         outputs = _load_histogram_outputs(ordered_inputs)
         mc_outputs = outputs.get("mc", {})
         data_outputs = outputs.get("data", {})
-        if not data_outputs or not mc_outputs:
-            logger.warning("Missing MC or data histograms; skipping plot creation")
-            return
+        if not data_outputs and not mc_outputs:
+            raise RuntimeError("Missing MC and data histograms; skipping plot creation")
 
         if self.lumi:
             mc_outputs = scaleSumW(mc_outputs, self.lumi)
@@ -223,10 +222,13 @@ class PlotIterativeResults(BaseTask):
                     #     continue
 
                     mc_hist = collated["mc"][key]
-                    data_hist = collated["data"][key]
                     mc_helper = HistogramHelper(mc_hist, is_data=False)
-                    data_helper = HistogramHelper(data_hist, is_data=True)
 
+                    if collated["data"] is not None:
+                        data_hist = collated["data"][key]
+                        data_helper = HistogramHelper(data_hist, is_data=True)
+                    else:
+                        data_helper = None
                     save_path = plot_root / variable / channel
                     save_path.mkdir(parents=True, exist_ok=True)
 

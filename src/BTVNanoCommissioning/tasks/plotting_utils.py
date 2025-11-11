@@ -323,13 +323,13 @@ class HistogramHelper:
 
 def plot_data_mc_histograms(
     mc_histogram: HistogramHelper,
-    data_histogram: HistogramHelper,
     region: str,
     channel: str,
     save_path: Path,
     com: float,
     lumi_label: str,
     *,
+    data_histogram: HistogramHelper = None,
     split_flavor: bool = False,
     eta_bin: Any = sum,
     jet_index: Any = sum,
@@ -341,7 +341,9 @@ def plot_data_mc_histograms(
         if split_flavor and not mc_histogram.has_axis("flav"):
             return
 
-        fig, (ax, ax_ratio) = define_figure(com=com, lumi_label=lumi_label)
+        fig, (ax, ax_ratio) = define_figure(
+            com=com, lumi_label=lumi_label, ratio=data_histogram is not None
+        )
 
         mc_histogram.plot_histogram(
             ax=ax,
@@ -350,13 +352,6 @@ def plot_data_mc_histograms(
             jet_index=jet_index,
             eta_bin=eta_bin,
             split_flavor=split_flavor,
-        )
-        data_histogram.plot_histogram(
-            ax=ax,
-            region=region,
-            channel=channel,
-            jet_index=jet_index,
-            eta_bin=eta_bin,
         )
 
         mc_histogram.plot_error_band(
@@ -367,15 +362,24 @@ def plot_data_mc_histograms(
             eta_bin=eta_bin,
         )
 
-        ax_ratio = plotratio(
-            data_histogram.get_summed(
-                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
-            ),
-            mc_histogram.get_summed(
-                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
-            ),
-            ax=ax_ratio,
-        )
+        if data_histogram is not None:
+            data_histogram.plot_histogram(
+                ax=ax,
+                region=region,
+                channel=channel,
+                jet_index=jet_index,
+                eta_bin=eta_bin,
+            )
+
+            ax_ratio = plotratio(
+                data_histogram.get_summed(
+                    region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
+                ),
+                mc_histogram.get_summed(
+                    region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
+                ),
+                ax=ax_ratio,
+            )
 
         configure_plot(
             fig=fig, ax=ax, region=region, channel=channel, ax_ratio=ax_ratio
