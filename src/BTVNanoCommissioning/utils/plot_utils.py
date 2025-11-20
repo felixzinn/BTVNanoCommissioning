@@ -85,7 +85,7 @@ sample_mergemap = {
     "W+jets": [
         "WJetsToLNu_TuneCP5_13p6TeV-madgraphMLM-pythia8",
         "WtoLNu-4Jets_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-        # jet binned sample
+        # jet binned samples
         "WtoLNu-4Jets_1J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_2J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_3J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
