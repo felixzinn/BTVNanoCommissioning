@@ -201,7 +201,9 @@ correction_config = {
             "mu_Iso": "NUM_TightPFIso_DEN_TightID",
         },
         "EGM": {
-            "ele_Reco 2024 Electron-ID-SF": "",
+            "ele_Reco 2024Prompt Electron-ID-SF": "",
+        },
+        "EGM_ID": {
             "ele_ID 2024 Electron-ID-SF": "wp80iso",
         },
         "muonSS": "",

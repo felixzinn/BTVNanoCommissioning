@@ -79,11 +79,13 @@ sample_mergemap = {
         "DYto2E-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "DYto2Mu_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
         "DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "DYto2Tau_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
         "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
     ],
     "W+jets": [
         "WJetsToLNu_TuneCP5_13p6TeV-madgraphMLM-pythia8",
+        "WtoLNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "WtoLNu-4Jets_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         # jet binned samples
         "WtoLNu-4Jets_1J_TuneCP5_13p6TeV_madgraphMLM-pythia8",

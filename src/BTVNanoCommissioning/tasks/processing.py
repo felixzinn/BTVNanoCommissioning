@@ -141,6 +141,10 @@ class ProcessDatasets(BaseTask):
             ),
         )
 
+    @property
+    def skip_output_removal(self) -> bool:
+        return not self.test
+
     def store_parts(self):
         return super().store_parts() + (self.campaign, self.workflow)
 

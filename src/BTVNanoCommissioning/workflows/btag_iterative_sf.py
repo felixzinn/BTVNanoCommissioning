@@ -138,7 +138,8 @@ def jet_selection(events, campaign: str):
     """
     logger.debug("Selecting jets")
     jets = events.Jet
-    mask = jet_id(events, campaign, max_eta=2.5, min_pt=20.0)
+    mask = jet_id(events, campaign, max_eta=2.5, min_pt=20.0)  # jetIdTightLepVeto
+    # mask = (jets.pt > 20.0) & (np.abs(jets.eta) < 2.5) & (jets.isTight)
     return jets[mask]
 
 
@@ -158,7 +159,9 @@ def z_diamond(jets, met, leptons, dilep_mass):
 CHANNELS = {"ee", "mumu", "emu"}  # , "incl"
 # CHANNELS = {"incl"}  # all four channels to large for 60 GB of RAM
 HISTOGRAM_AXES = {
-    "flav_axis": hist.axis.IntCategory([0, 1, 4, 5, 6], name="flav", label="Flavor"),
+    "flav_axis": hist.axis.IntCategory(
+        [0, 1, 4, 5, 6], name="flav", label="Flavor", growth=True
+    ),
     "sys_axis": hist.axis.StrCategory([], name="syst", growth=True),
     "dr_axis": hist.axis.Regular(20, 0, 8, name="dr", label="$\Delta$R"),
     "pt_axis": hist.axis.Regular(
@@ -274,55 +277,6 @@ def fill_histograms(
             else weights.weight(modifier=syst)
         )
 
-        if syst == "nominal":
-            # fill only nominal
-            # kinematic distributions
-            for region in ("HF", "LF"):
-                for obj, attrs in particle_objects.items():
-                    for attr in attrs:
-                        # if # in obj, use the index to access the correct object
-                        parts = obj.split("#", 1)  # maxsplit=1 ensures at most 2 parts
-                        _obj = parts[0]
-                        if len(parts) > 1:
-                            index = int(parts[1])
-                            attr_value = getattr(pruned_events[_obj][:, index], attr)
-                        else:
-                            attr_value = getattr(pruned_events[_obj], attr)
-
-                        # flatten array if more than one dimension
-                        weight_flat = weight
-                        if attr_value.ndim > 1:
-                            weight_flat, attr_value = broadcast_and_flatten(
-                                weight, attr_value
-                            )
-
-                        histograms[f"{obj}_{attr}"].fill(
-                            **{
-                                attr: attr_value,
-                                "weight": weight_flat,
-                                "syst": syst,
-                                "region": region,
-                            },
-                        )
-
-                # delta R between jets
-                histograms["dr_jets"].fill(
-                    syst=syst,
-                    region=region,
-                    weight=weight,
-                    dr=pruned_events["SelJet"][:, 0].delta_r(
-                        pruned_events["SelJet"][:, 1]
-                    ),
-                )
-
-                # number of jets
-                histograms["njet"].fill(
-                    njet=pruned_events.njet,
-                    region=region,
-                    weight=weight,
-                    syst=syst,
-                )
-
         logger.debug("filling b-tag discriminant histograms for syst %s", syst)
         for b_tagger in b_taggers:
             for jet_index in (1, 0):
@@ -332,6 +286,12 @@ def fill_histograms(
                         region_channel_mask = flavor_and_regions[
                             f"{region}_{channel}_{b_tagger}_probe_jet{jet_index}"
                         ]
+                        _mask = flavor_and_regions[
+                            f"HF_{channel}_{b_tagger}_probe_jet{jet_index}"
+                        ]
+                        assert ak.all(pruned_events["PuppiMET"].pt[_mask] > 30.0), (
+                            f"HF {channel} MET pt cut not met"
+                        )
                         if not ak.any(region_channel_mask):
                             continue
                         jet = pruned_events.SelJet[:, jet_index]
@@ -354,6 +314,61 @@ def fill_histograms(
                             },
                             weight=weight[region_channel_mask],
                         )
+
+                        if syst == "nominal":
+                            # fill only nominal
+                            # kinematic distributions
+                            for obj, attrs in particle_objects.items():
+                                for attr in attrs:
+                                    # if # in obj, use the index to access the correct object
+                                    parts = obj.split(
+                                        "#", 1
+                                    )  # maxsplit=1 ensures at most 2 parts
+                                    _obj = parts[0]
+                                    if len(parts) > 1:
+                                        index = int(parts[1])
+                                        attr_value = getattr(
+                                            pruned_events[_obj][:, index], attr
+                                        )
+                                    else:
+                                        attr_value = getattr(pruned_events[_obj], attr)
+
+                                    # flatten array if more than one dimension
+                                    weight_flat = weight[region_channel_mask]
+                                    attr_value = attr_value[region_channel_mask]
+
+                                    if attr_value.ndim > 1:
+                                        weight_flat, attr_value = broadcast_and_flatten(
+                                            weight_flat,
+                                            attr_value,
+                                        )
+
+                                    histograms[f"{obj}_{attr}"].fill(
+                                        **{
+                                            attr: attr_value,
+                                            "weight": weight_flat,
+                                            "syst": syst,
+                                            "region": region,
+                                        },
+                                    )
+
+                            # delta R between jets
+                            histograms["dr_jets"].fill(
+                                syst=syst,
+                                region=region,
+                                weight=weight[region_channel_mask],
+                                dr=pruned_events["SelJet"][:, 0].delta_r(
+                                    pruned_events["SelJet"][:, 1]
+                                )[region_channel_mask],
+                            )
+
+                            # number of jets
+                            histograms["njet"].fill(
+                                njet=pruned_events.njet[region_channel_mask],
+                                region=region,
+                                weight=weight[region_channel_mask],
+                                syst=syst,
+                            )
 
     return histograms
 
@@ -395,20 +410,35 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             ParT_name = "btagRobustParTAK4B"
 
         self.b_tagger_config = {
-            "btagDeepFlavB": {
-                "loose": 0.0614,
-                "medium": 0.3196,
-                "tight": 0.73,
-            },
+            # "btagDeepFlavB": {
+            #     # https://btv-wiki.docs.cern.ch/ScaleFactors/Run3Summer23/#ak4-b-tagging
+            #     "2023": {
+            #         "loose": 0.0476,
+            #         "medium": 0.2431,
+            #         "tight": 0.6553,
+            #     },
+            # },
             # "btagPNetB": {
-            #     "loose": 0.1,
-            #     "medium": 0.5,
-            #     "tight": 0.9,
+            # https://btv-wiki.docs.cern.ch/ScaleFactors/Run3Summer23/#ak4-b-tagging
+            #     "2023": {
+            #         "loose": 0.0358,
+            #         "medium": 0.1917,
+            #         "tight": 0.6172,
+            #     },
             # },
             ParT_name: {
-                "loose": 0.0897,
-                "medium": 0.451,
-                "tight": 0.8604,
+                # https://git.rwth-aachen.de/3pia/cms_analyses/common/-/blob/jtsf/config/Run3_pp_136TeV_2023.py?ref_type=heads
+                "2023": {
+                    "loose": 0.0681,
+                    "medium": 0.3487,
+                    "tight": 0.7969,
+                },
+                # https://btv-wiki.docs.cern.ch/ScaleFactors/Run3Summer24/#ak4-b-tagging
+                "2024": {
+                    "loose": 0.0246,
+                    "medium": 0.1272,
+                    "tight": 0.4648,
+                },
             },
         }
 
@@ -428,16 +458,21 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
             "PuppiMET": ["pt", "phi"],
             "dilep": ["pt", "eta", "phi", "mass"],
             "SelMuon": ["pt", "eta", "phi"],
-            # "SelElectron": ["pt", "eta", "phi"],
+            "SelElectron": ["pt", "eta", "phi"],
         }
+
+        if channel_selector == "mumu":
+            self.particle_objects.pop("SelElectron")
+        elif channel_selector == "ee":
+            self.particle_objects.pop("SelMuon")
 
     def process(self, events):
         events = missing_branch(events)
         logger.info("preparing shifts")
-        shifts = common_shifts(self, events)
+        vetoed_events, shifts = common_shifts(self, events)
 
         return processor.accumulate(
-            self.process_shift(update(events, collections), name)
+            self.process_shift(update(vetoed_events, collections), name)
             for collections, name in shifts
         )
 
@@ -650,7 +685,6 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
         logger.debug("tag-and-probe")
         flavor_and_regions = {}
         for i_tag_jet, i_probe_jet in [(0, 1), (1, 0)]:
-            # for swapping, use: [(0, 1), (1, 0)]
             for b_tagger, config in self.b_tagger_config.items():
                 tag_jet = ak.firsts(good_jets[:, i_tag_jet : i_tag_jet + 1])
                 probe_jet = ak.firsts(good_jets[:, i_probe_jet : i_probe_jet + 1])
@@ -660,8 +694,8 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
 
                 # cuts on jets
                 tag_jet_cut = {
-                    "HF": b_score_tag_jet >= config["medium"],
-                    "LF": b_score_tag_jet <= config["loose"],
+                    "HF": b_score_tag_jet >= config[self._year]["medium"],
+                    "LF": b_score_tag_jet <= config[self._year]["loose"],
                 }
 
                 # flavor of probe jet
@@ -671,7 +705,7 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                     flavor_probe_jet = np.abs(
                         ak.fill_none(
                             probe_jet.hadronFlavour,
-                            0,
+                            0,  # everything unknown is considered light flavor
                         )
                     )
                 # b_flavor = flavor_probe_jet == 5
@@ -705,6 +739,15 @@ class BTagIterativeSFProcessor(processor.ProcessorABC):
                         tag_jet_cut["LF"],
                         lepton_region_cut_LF,
                     )[event_level_mask]
+
+        # assert that cuts are met
+        try:
+            mask = flavor_and_regions[f"HF_{self._channel}_btagDeepFlavB_probe_jet0"]
+        except KeyError:
+            pass
+        else:
+            if not (ak.all(pruned_events["PuppiMET"].pt[mask] > 30.0)):
+                raise ValueError("HF ee MET pt cut not met")
 
         # ==============
         # weights

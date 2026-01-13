@@ -667,7 +667,6 @@ met_filters = {
             "BadPFMuonDzFilter",
             "hfNoisyHitsFilter",
             "eeBadScFilter",
-            "ecalBadCalibFilter",
         ],
         "mc": [
             "goodVertices",
@@ -677,7 +676,6 @@ met_filters = {
             "BadPFMuonDzFilter",
             "hfNoisyHitsFilter",
             "eeBadScFilter",
-            "ecalBadCalibFilter",
         ],
     },
     "prompt_dataMC": {

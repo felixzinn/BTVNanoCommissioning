@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+from functools import reduce
+from operator import add as _add
 
 import hist
 import matplotlib.pyplot as plt
@@ -189,7 +191,7 @@ class HistogramHelper:
         *,
         jet_index: Any = sum,
         eta_bin: Any = sum,
-    ) -> list[hist.Hist]:
+    ) -> tuple[list[hist.Hist], list[str]]:
         """Return a list of per-flavour histograms for the given selection."""
 
         if self.is_data:
@@ -197,9 +199,9 @@ class HistogramHelper:
         if not self.has_axis("flav"):
             raise ValueError("Histogram does not contain a flavour axis")
 
-        flavour_indices: Iterable[Sequence[int]] = FLAVOR_LABELS.values()
-        results: list[hist.Hist] = []
-        for indices in flavour_indices:
+        hists: list[hist.Hist] = []
+        labels: list[str] = []
+        for label, indices in FLAVOR_LABELS.items():
             overrides = {
                 "flav": list(self._flav_axis.index(indices)),
                 "region": region,
@@ -211,8 +213,12 @@ class HistogramHelper:
             hist_view = self.histogram[selection]
             if "flav" in hist_view.axes.name:
                 hist_view = hist_view[{"flav": sum}]
-            results.append(hist_view)
-        return results
+            hists.append(hist_view)
+            labels.append(label)
+        pair = list(zip(hists, labels))
+        pair.sort(key=lambda x: x[0].sum().value)  # sort by label
+        hists, labels = zip(*pair)
+        return list(hists), list(labels)
 
     def plot_error_band(
         self,
@@ -261,11 +267,12 @@ class HistogramHelper:
             return
 
         if split_flavor and self.has_axis("flav"):
+            hists, labels = self.get_by_flavor(
+                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
+            )
             mplhep.histplot(
-                self.get_by_flavor(
-                    region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
-                ),
-                label=list(FLAVOR_LABELS.keys()),
+                hists,
+                label=labels,
                 stack=stack,
                 histtype="fill" if stack else "step",
                 yerr=True,
@@ -322,7 +329,7 @@ class HistogramHelper:
 
 
 def plot_data_mc_histograms(
-    mc_histogram: HistogramHelper,
+    mc_histogram: Any,  # either HistogramHelper or dict[str, HistogramHelper],
     region: str,
     channel: str,
     save_path: Path,
@@ -335,34 +342,92 @@ def plot_data_mc_histograms(
     jet_index: Any = sum,
     plot_format: str = "png",
 ) -> None:
-    """Plot a data-vs-MC comparison with an optional flavour split."""
+    """Plot a data-vs-MC comparison with optional flavour split or sample stack.
+
+    Supports two input modes for `mc_histogram`:
+    - single `HistogramHelper` (legacy): plot summed or flavour-split MC vs data
+    - mapping str->`HistogramHelper`: treat keys as samples and stack them
+      (summed over flavours) and draw a total MC error band for the ratio.
+    """
 
     with rc_context(mplhep.style.CMS):
-        if split_flavor and not mc_histogram.has_axis("flav"):
-            return
+        # Detect sample map mode
+        is_sample_map = isinstance(mc_histogram, dict)
+
+        # If user requested flavour-split but we are plotting per-sample stacks,
+        # ignore split_flavor (samples are the split axis in that case).
+        if is_sample_map and split_flavor:
+            split_flavor = False
 
         fig, (ax, ax_ratio) = define_figure(
             com=com, lumi_label=lumi_label, ratio=data_histogram is not None
         )
 
-        mc_histogram.plot_histogram(
-            ax=ax,
-            region=region,
-            channel=channel,
-            jet_index=jet_index,
-            eta_bin=eta_bin,
-            split_flavor=split_flavor,
-        )
+        total_mc_hist = None
 
-        mc_histogram.plot_error_band(
-            ax=ax,
-            region=region,
-            channel=channel,
-            jet_index=jet_index,
-            eta_bin=eta_bin,
-        )
+        if is_sample_map:
+            # produce a stacked plot of samples (summed over flavours)
+            sample_names = list(mc_histogram.keys())
+            sample_hists = []
+            for name in sample_names:
+                helper = mc_histogram[name]
+                sample_hists.append(
+                    helper.get_summed(
+                        region=region,
+                        channel=channel,
+                        eta_bin=eta_bin,
+                        jet_index=jet_index,
+                    )
+                )
 
-        if data_histogram is not None:
+            # choose colors and draw stack
+            cmap = plt.get_cmap("tab10")
+            colors = [cmap(i % 10) for i in range(len(sample_hists))]
+            mplhep.histplot(
+                sample_hists,
+                label=sample_names,
+                stack=True,
+                histtype="fill",
+                yerr=True,
+                color=colors,
+                ax=ax,
+            )
+
+            # compute total MC (sum of samples) for error band and ratio
+            try:
+                total_mc_hist = reduce(_add, sample_hists)
+            except Exception:
+                total_mc_hist = sample_hists[0]
+                for h in sample_hists[1:]:
+                    total_mc_hist = total_mc_hist + h
+
+            MCerrorband(total_mc_hist, ax=ax)
+
+        else:
+            # legacy: single histogram helper
+            mc_histogram.plot_histogram(
+                ax=ax,
+                region=region,
+                channel=channel,
+                jet_index=jet_index,
+                eta_bin=eta_bin,
+                split_flavor=split_flavor,
+            )
+
+            mc_histogram.plot_error_band(
+                ax=ax,
+                region=region,
+                channel=channel,
+                jet_index=jet_index,
+                eta_bin=eta_bin,
+            )
+
+            total_mc_hist = mc_histogram.get_summed(
+                region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
+            )
+
+        # draw data if present and the ratio to the total MC
+        if data_histogram is not None and total_mc_hist is not None:
             data_histogram.plot_histogram(
                 ax=ax,
                 region=region,
@@ -375,9 +440,7 @@ def plot_data_mc_histograms(
                 data_histogram.get_summed(
                     region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
                 ),
-                mc_histogram.get_summed(
-                    region=region, channel=channel, jet_index=jet_index, eta_bin=eta_bin
-                ),
+                total_mc_hist,
                 ax=ax_ratio,
             )
 
@@ -390,7 +453,9 @@ def plot_data_mc_histograms(
             filename_parts.append(f"jet{jet_index}")
         if eta_bin is not None and eta_bin is not sum:
             filename_parts.append(f"etabin{eta_bin}")
-        label = "stacked" if split_flavor else "summed"
+        label = (
+            "samples" if is_sample_map else ("stacked" if split_flavor else "summed")
+        )
         filename_parts.append(f"{region}_histograms_{label}")
         filename = "_".join(filename_parts)
 
@@ -400,7 +465,7 @@ def plot_data_mc_histograms(
 
 
 def plot_MC_histograms_separately(
-    mc_histogram: HistogramHelper,
+    mc_histogram: Any,  # HistogramHelper or dict[str, HistogramHelper]
     region: str,
     channel: str,
     save_path: Path,
@@ -410,22 +475,54 @@ def plot_MC_histograms_separately(
     eta_bin: Any = sum,
     plot_format: str = "png",
 ) -> None:
-    """Plot the MC components as separate lines without data or ratio panels."""
+    """Plot MC components as separate lines.
+
+    If `mc_histogram` is a dict, each key is treated as a separate sample and
+    plotted as an individual line (summed over flavours). If a single
+    HistogramHelper is provided and it contains a flavour axis, the flavours
+    are plotted as separate lines (legacy behaviour).
+    """
 
     with rc_context(mplhep.style.CMS):
         fig, (ax, _) = define_figure(com=com, lumi_label=lumi_label, ratio=False)
-        mc_histogram.plot_histogram(
-            ax=ax,
-            region=region,
-            channel=channel,
-            jet_index=sum,
-            eta_bin=eta_bin,
-            split_flavor=mc_histogram.has_axis("flav"),
-            stack=False,
-        )
-        configure_plot(
-            fig=fig, ax=ax, region=region, channel=channel, xlabel=mc_histogram.label
-        )
+
+        if isinstance(mc_histogram, dict):
+            sample_names = list(mc_histogram.keys())
+            sample_hists = []
+            for name in sample_names:
+                helper = mc_histogram[name]
+                sample_hists.append(
+                    helper.get_summed(
+                        region=region, channel=channel, eta_bin=eta_bin, jet_index=sum
+                    )
+                )
+            cmap = plt.get_cmap("tab10")
+            colors = [cmap(i % 10) for i in range(len(sample_hists))]
+            mplhep.histplot(
+                sample_hists,
+                label=sample_names,
+                stack=False,
+                histtype="step",
+                yerr=True,
+                color=colors,
+                ax=ax,
+            )
+            xlabel = ", ".join(sample_names)
+
+        else:
+            # legacy: show flavours as separate lines if available
+            mc_histogram.plot_histogram(
+                ax=ax,
+                region=region,
+                channel=channel,
+                jet_index=sum,
+                eta_bin=eta_bin,
+                split_flavor=mc_histogram.has_axis("flav"),
+                stack=False,
+            )
+            xlabel = mc_histogram.label
+
+        configure_plot(fig=fig, ax=ax, region=region, channel=channel, xlabel=xlabel)
 
         filename = f"{region}_histograms_separate"
         if eta_bin is not None and eta_bin is not sum:

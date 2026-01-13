@@ -14,8 +14,7 @@ ISSYST="False"
 TEST_MODE=false
 TEST_MAX=""  # Add this new variable
 OVERWRITE=""
-# CHUNKSIZE=250000
-CHUNKSIZE=1000
+CHUNKSIZE=400000
 VERSION="no_version"
 
 # Function to display usage
@@ -166,12 +165,6 @@ fi
 
 # https://superuser.com/questions/461981/how-do-i-convert-a-bash-array-variable-to-a-string-delimited-with-newlines
 runs=$( IFS=$','; echo "${RUN_PERIOD[*]}" )
-output_data=""
-for run in "${RUN_PERIOD[@]}"; do
-    output_data+="hists_data_${run}/hists_data_${run}.coffea,"
-done
-output_data=${output_data%,}  # remove trailing comma
-
 
 echo "Configuration:"
 echo "  Campaign: $CAMPAIGN"
@@ -198,7 +191,7 @@ fi
 OUTPUTDIR="/net/data_cms3a-1/BTV/btag_sf/${CAMPAIGN}/${WORKFLOW_CHANNEL}/${VERSION}"
 
 # execution
-for json in dy ttbar WZ singletop; do
+for json in ttbar dy WZ singletop dy_lo; do
     python runner.py \
         --json "metadata/${CAMPAIGN}/btag_iterative_sf/${json}.json" \
         --workflow "${WORKFLOW_CHANNEL}" \
@@ -215,7 +208,19 @@ for json in dy ttbar WZ singletop; do
         --isSyst "$ISSYST" \
         ${OVERWRITE:+--overwrite} \
         --splitjobs
-    echo
+    echo ""
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        echo "Done processing ${json}"
+        # if [ -d "runinfo" ]; then
+        #     runinfo_dir=$(ls runinfo | tail -n 1)
+        #     rm -rf "runinfo/${runinfo_dir}"
+        # fi
+    else
+        echo "Failed processing ${json}"
+    fi
+    echo ""
+
 done
 
 for run in "${RUN_PERIOD[@]}"; do
@@ -236,7 +241,27 @@ for run in "${RUN_PERIOD[@]}"; do
         ${OVERWRITE:+--overwrite} \
         --splitjobs
     echo
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        echo "Done processing ${run}"
+        # get latest runinfo directory
+        runinfo_dir=$(ls runinfo | tail -n 1)
+        rm -rf "runinfo/${runinfo_dir}"
+    else
+        echo "Failed processing ${run}"
+    fi
+    echo
 done
+
+output_data=""
+for run in "${RUN_PERIOD[@]}"; do
+    coffea_file="$OUTPUTDIR/hists_data_${run}/hists_data_${run}.coffea"
+    echo "$coffea_file"
+    if [ -f "$coffea_file" ]; then
+        output_data="${output_data}hists_data_${run}/hists_data_${run}.coffea,"
+    fi
+done
+echo "Data files: $output_data"
 
 if [ "$TEST_MODE" = false ]; then
     basedir=$(pwd)
@@ -244,7 +269,7 @@ if [ "$TEST_MODE" = false ]; then
     python ${basedir}/scripts/plotdataMC.py \
         -p btag_iterative_sf_mumu \
         -v all \
-        -i ${output_data},hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+        -i "${output_data},hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea" \
         --lumi $LUMI \
         --log \
         --split sample
@@ -253,9 +278,12 @@ if [ "$TEST_MODE" = false ]; then
     python ${basedir}/scripts/plotdataMC.py \
         -p btag_iterative_sf_mumu \
         -v all \
-        -i hists_data/hists_data.coffea,hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea \
+        -i "${output_data},hists_MC_dy/hists_MC_dy.coffea,hists_MC_ttbar/hists_MC_ttbar.coffea,hists_MC_WZ/hists_MC_WZ.coffea,hists_MC_singletop/hists_MC_singletop.coffea" \
         --lumi $LUMI \
         --split sample
 
     python ${basedir}/scripts/plot_histograms_iterative_btagSF.py --lumi $LUMI --log-level info
 fi
+
+# change group rights
+chmod --recursive g+rwx "$OUTPUTDIR"

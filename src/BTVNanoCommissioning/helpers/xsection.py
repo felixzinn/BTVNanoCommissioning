@@ -36,6 +36,10 @@ xsection = [
         "cross_section": str(dy_xsection),
     },
     {
+        "process_name": "DYto2Mu-4Jets_Bin-MLL-50_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "cross_section": "5447",  # XSDB
+    },
+    {
         "process_name": "DYto2E_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
         "cross_section": str(dy_xsection_10to50),
     },
@@ -44,12 +48,20 @@ xsection = [
         "cross_section": str(dy_xsection),
     },
     {
+        "process_name": "DYto2E-4Jets_Bin-MLL-50_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "cross_section": "5481",  # XSDB
+    },
+    {
         "process_name": "DYto2Tau_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
         "cross_section": str(dy_xsection_10to50),
     },
     {
         "process_name": "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "cross_section": str(dy_xsection),
+    },
+    {
+        "process_name": "DYto2Tau-4Jets_Bin-MLL-50_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "cross_section": "5447",  # no XSDB, using same as muon
     },
     {
         "process_name": "WtoENu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
@@ -62,6 +74,10 @@ xsection = [
     {
         "process_name": "WtoTauNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "cross_section": str(wjets_xsection),
+    },
+    {
+        "process_name": "WtoLNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "cross_section": str(wjets_xsection * 3),
     },
     {
         "process_name": "DYJetsToLL_M-10to50_TuneCP5_13p6TeV-madgraphMLM-pythia8",

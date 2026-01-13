@@ -176,6 +176,7 @@ def load_SF(year, campaign, syst=False):
             ## electron
             for _ele_file, _ele_map in {
                 "electron": "EGM",
+                "electronID": "EGM_ID",
                 "electronHlt": "EGM_HLT",
             }.items():
                 _ele_path = f"/cvmfs/cms-griddata.cern.ch/cat/metadata/EGM/{campaign_map()[campaign]}/latest//{_ele_file}.json.gz"
@@ -584,6 +585,7 @@ def JME_shifts(
     ]
     if "JME" in correct_map.keys():
         ## correctionlib
+        jes_sources = get_jes_keys(year)
         if "JME_cfg" in correct_map.keys():
             if isRealData:
                 jecname = [
@@ -674,7 +676,6 @@ def JME_shifts(
             met["orig_pt"], met["orig_phi"] = nocorrmet["pt"], nocorrmet["phi"]
 
             ## JEC variations
-            jes_sources = get_jes_keys(year)
             if not isRealData and systematic != False:
                 jes_sources_id = systematic.split("_")[1]
                 if jes_sources_id in jes_sources.keys():
@@ -698,34 +699,28 @@ def JME_shifts(
                                 # * (ak.unflatten(JECflatCorrFactor, nj) + fac * jesunc),
                                 np.float32,
                             )
-                            unc_jets[f"{jes}{var}"]["mass"] = (
-                                ak.values_astype(
-                                    jets["mass"] * (1 + fac * jesunc),
-                                    # * (
-                                    #     ak.unflatten(JECflatCorrFactor, nj)
-                                    #     + fac * jesunc
-                                    # ),
-                                    np.float32,
-                                )
+                            unc_jets[f"{jes}{var}"]["mass"] = ak.values_astype(
+                                jets["mass"] * (1 + fac * jesunc),
+                                # * (
+                                #     ak.unflatten(JECflatCorrFactor, nj)
+                                #     + fac * jesunc
+                                # ),
+                                np.float32,
                             )
-                            unc_met[f"{jes}{var}"]["pt"] = (
-                                corrected_polar_met(
-                                    nocorrmet.pt,
-                                    nocorrmet.phi,
-                                    unc_jets[f"{jes}{var}"]["pt"],
-                                    jets.phi,
-                                    jets.pt_raw,
-                                ).pt
-                            )
-                            unc_met[f"{jes}{var}"]["phi"] = (
-                                corrected_polar_met(
-                                    nocorrmet.pt,
-                                    nocorrmet.phi,
-                                    unc_jets[f"{jes}{var}"]["pt"],
-                                    jets.phi,
-                                    jets.pt_raw,
-                                ).phi
-                            )
+                            unc_met[f"{jes}{var}"]["pt"] = corrected_polar_met(
+                                nocorrmet.pt,
+                                nocorrmet.phi,
+                                unc_jets[f"{jes}{var}"]["pt"],
+                                jets.phi,
+                                jets.pt_raw,
+                            ).pt
+                            unc_met[f"{jes}{var}"]["phi"] = corrected_polar_met(
+                                nocorrmet.pt,
+                                nocorrmet.phi,
+                                unc_jets[f"{jes}{var}"]["pt"],
+                                jets.phi,
+                                jets.pt_raw,
+                            ).phi
 
                         jets[f"{jes}"] = ak.zip(
                             {
@@ -750,74 +745,72 @@ def JME_shifts(
                 for var in ("up", "down"):
                     JERSF_input_var = get_corr_inputs(j, JERSF, var)
 
-                        ## JER variations
-                        if sf_jersmear is None:
-                            warnings.warn(
-                                "Skipping JER smearing variations because the "
-                                "correction file is unavailable.",
-                                RuntimeWarning,
-                                stacklevel=2,
-                            )
-                            unc_jets[f"JER{var}"] = copy.copy(jets)
-                            unc_met[f"JER{var}"] = copy.copy(met)
-                        else:
-                            unc_jets[f"JER{var}"] = copy.copy(nocorrjet)
-                            unc_met[f"JER{var}"] = copy.copy(nocorrmet)
-                            j["JERSF"] = JERSF.evaluate(*JERSF_input_var)
-                            JERsmear_input_var = get_corr_inputs(j, sf_jersmear)
-                            corrFactor_var = JECflatCorrFactor * sf_jersmear.evaluate(
-                                *JERsmear_input_var
-                            )
-                            corrFactor_var = ak.unflatten(corrFactor_var, nj)
+                    ## JER variations
+                    if sf_jersmear is None:
+                        warnings.warn(
+                            "Skipping JER smearing variations because the "
+                            "correction file is unavailable.",
+                            RuntimeWarning,
+                            stacklevel=2,
+                        )
+                        unc_jets[f"JER{var}"] = copy.copy(jets)
+                        unc_met[f"JER{var}"] = copy.copy(met)
+                    else:
+                        unc_jets[f"JER{var}"] = copy.copy(nocorrjet)
+                        unc_met[f"JER{var}"] = copy.copy(nocorrmet)
+                        j["JERSF"] = JERSF.evaluate(*JERSF_input_var)
+                        JERsmear_input_var = get_corr_inputs(j, sf_jersmear)
+                        corrFactor_var = JECflatCorrFactor * sf_jersmear.evaluate(
+                            *JERsmear_input_var
+                        )
+                        corrFactor_var = ak.unflatten(corrFactor_var, nj)
 
-                            unc_jets[f"JER{var}"]["pt"] = ak.values_astype(
-                                nocorrjet["pt_raw"] * corrFactor_var,
-                                np.float32,
-                            )
-                            unc_jets[f"JER{var}"]["mass"] = ak.values_astype(
-                                nocorrjet["mass_raw"] * corrFactor_var,
-                                np.float32,
-                            )
-                            unc_met[f"JER{var}"]["pt"] = corrected_polar_met(
-                                nocorrmet.pt,
-                                nocorrmet.phi,
-                                unc_jets[f"JER{var}"]["pt"],
-                                jets.phi,
-                                jets.pt_raw,
-                            ).pt
-                            unc_met[f"JER{var}"]["phi"] = corrected_polar_met(
-                                nocorrmet.pt,
-                                nocorrmet.phi,
-                                unc_jets[f"JER{var}"]["pt"],
-                                jets.phi,
-                                jets.pt_raw,
-                            ).phi
-                    jets["JES_Total"] = ak.zip(
-                        {
-                            "up": unc_jets["JES_Totalup"],
-                            "down": unc_jets["JES_Totaldown"],
-                        }
-                    )
-                    jets["JER"] = ak.zip(
-                        {
-                            "up": unc_jets["JERup"],
-                            "down": unc_jets["JERdown"],
-                        }
-                    )
-                    met["JES_Total"] = ak.zip(
-                        {
-                            "up": unc_met["JES_Totalup"],
-                            "down": unc_met["JES_Totaldown"],
-                        }
-                    )
-                    met["JER"] = ak.zip(
-                        {
-                            "up": unc_met["JERup"],
-                            "down": unc_met["JERdown"],
-                        }
-                    )
-                else:
-                    raise NotImplementedError
+                        unc_jets[f"JER{var}"]["pt"] = ak.values_astype(
+                            nocorrjet["pt_raw"] * corrFactor_var,
+                            np.float32,
+                        )
+                        unc_jets[f"JER{var}"]["mass"] = ak.values_astype(
+                            nocorrjet["mass_raw"] * corrFactor_var,
+                            np.float32,
+                        )
+                        unc_met[f"JER{var}"]["pt"] = corrected_polar_met(
+                            nocorrmet.pt,
+                            nocorrmet.phi,
+                            unc_jets[f"JER{var}"]["pt"],
+                            jets.phi,
+                            jets.pt_raw,
+                        ).pt
+                        unc_met[f"JER{var}"]["phi"] = corrected_polar_met(
+                            nocorrmet.pt,
+                            nocorrmet.phi,
+                            unc_jets[f"JER{var}"]["pt"],
+                            jets.phi,
+                            jets.pt_raw,
+                        ).phi
+                jets["JES_Total"] = ak.zip(
+                    {
+                        "up": unc_jets["JES_Totalup"],
+                        "down": unc_jets["JES_Totaldown"],
+                    }
+                )
+                jets["JER"] = ak.zip(
+                    {
+                        "up": unc_jets["JERup"],
+                        "down": unc_jets["JERdown"],
+                    }
+                )
+                met["JES_Total"] = ak.zip(
+                    {
+                        "up": unc_met["JES_Totalup"],
+                        "down": unc_met["JES_Totaldown"],
+                    }
+                )
+                met["JER"] = ak.zip(
+                    {
+                        "up": unc_met["JERup"],
+                        "down": unc_met["JERdown"],
+                    }
+                )
 
         else:
             if isRealData:
@@ -1343,7 +1336,7 @@ def puwei(nPU, correct_map, weights, syst=False):
         if syst:
             weights.add(
                 "puweight",
-                correct_map["LUM"]["LUM"](nPU),
+                correct_map["LUM"]["PU"](nPU),
                 correct_map["LUM"]["PUup"](nPU),
                 correct_map["LUM"]["PUdown"](nPU),
             )
@@ -1602,7 +1595,7 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                     if correct_map["campaign"] in [
                         "Summer23",
                         "Summer23BPix",
-                        "Summer24",
+                        # "Summer24",
                     ]:
                         sfs_low = np.where(
                             (ele.pt <= 20.0) & ~masknone,
@@ -1840,12 +1833,12 @@ def eleSFs(ele, correct_map, weights, syst=True, isHLT=False):
                         _ele_map = "EGM_HLT"
                     # ID SFs
                     else:
-                        _ele_map = "EGM"
+                        _ele_map = "EGM_ID"
 
                     if correct_map["campaign"] in [
                         "Summer23",
                         "Summer23BPix",
-                        "Summer24",
+                        # "Summer24",
                     ]:
                         sfs = np.where(
                             masknone | (ele.pt > 1000.0),

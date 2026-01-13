@@ -16,6 +16,7 @@ from BTVNanoCommissioning.tasks.plotting_utils import (
     plot_MC_histograms_separately,
 )
 from BTVNanoCommissioning.tasks.processing import ProcessDatasets, processingparameters
+from BTVNanoCommissioning.utils.plot_utils import sample_mergemap
 
 
 def _is_data_sample(name: str) -> bool:
@@ -71,6 +72,14 @@ class plottingparameters(luigi.Config):
         description=(
             "JSON files describing the datasets to process before plotting. "
             "Provide paths relative to the repository root or absolute paths."
+        ),
+    )
+    split_by_samples = luigi.BoolParameter(
+        default=False,
+        description=(
+            "When true, use the sample_mergemap to split MC into named sample groups "
+            "(e.g. ttbar, Single top, VV) and include data under the 'data' key. "
+            "When false, use the legacy mergemap with keys 'mc' and 'data'."
         ),
     )
 
@@ -174,10 +183,19 @@ class PlotIterativeResults(BaseTask):
             mc_outputs = scaleSumW(mc_outputs, self.lumi)
 
         merged_outputs = {**mc_outputs, **data_outputs}
-        mergemap = {
-            "data": list(data_outputs.keys()),
-            "mc": list(mc_outputs.keys()),
-        }
+
+        # Choose mergemap based on whether the user wants sample splitting.
+        if self.split_by_samples:
+            # Start from the canonical sample_mergemap and ensure data is preserved
+            mergemap = sample_mergemap
+            mergemap["data"] = list(data_outputs.keys())
+        else:
+            # Legacy behaviour: a single 'mc' group plus 'data'
+            mergemap = {
+                "data": list(data_outputs.keys()),
+                "mc": list(mc_outputs.keys()),
+            }
+
         collated = collate(merged_outputs, mergemap)
 
         plot_root = Path(self.output().path)
@@ -204,9 +222,10 @@ class PlotIterativeResults(BaseTask):
                 if isinstance(item, hist.Hist)
             ]
             for variable in keys:
-                CHANNELS = (
-                    ("ee", "emu", "mumu", "incl") if "btag" in variable else ("incl",)
-                )
+                # CHANNELS = (
+                #     ("ee", "emu", "mumu", "incl") if "btag" in variable else ("incl",)
+                # )
+                CHANNELS = [self.workflow.replace("btag_iterative_sf_", "")]
                 for channel in CHANNELS:
                     if "btag" in variable:
                         if not variable.endswith(f"_{channel}"):
@@ -221,8 +240,15 @@ class PlotIterativeResults(BaseTask):
                     #     logger.debug("Skipping missing histogram key %s", key)
                     #     continue
 
-                    mc_hist = collated["mc"][key]
-                    mc_helper = HistogramHelper(mc_hist, is_data=False)
+                    if "mc" in collated:
+                        mc_hist = collated["mc"][key]
+                        mc_helper = HistogramHelper(mc_hist, is_data=False)
+                    else:
+                        mc_helper = {
+                            sample: HistogramHelper(histogram, is_data=False)
+                            for sample, histogram in collated.items()
+                            if sample != "data"
+                        }
 
                     if collated["data"] is not None:
                         data_hist = collated["data"][key]
@@ -307,6 +333,7 @@ class PlotAllChannels(law.WrapperTask, BaseTask):
 
     json = None  # json parameter not needed here
     channels = ("ee", "mumu", "emu")
+    workflow = None
 
     def requires(self):
         return [
