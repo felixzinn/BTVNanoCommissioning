@@ -49,6 +49,11 @@ from BTVNanoCommissioning.workflows.BTA_ttbar_producer import (
     NanoProcessor as BTA_ttbar_processor,
 )  # ttbar -kinFit
 
+# iterative b-tag SF workflow
+from BTVNanoCommissioning.workflows.btag_ttbar_iterative.workflow import (
+    BTagIterativeSFProcessor,
+)
+
 from BTVNanoCommissioning.workflows.example import (
     NanoProcessor as ExampleProcessor,
 )
@@ -117,5 +122,8 @@ workflows["BTA"] = BTA_processor
 workflows["BTA_addPFMuons"] = partial(BTA_processor, addPFMuons=True)
 workflows["BTA_addAllTracks"] = partial(BTA_processor, addAllTracks=True)
 workflows["BTA_ttbar"] = BTA_ttbar_processor
+
+# iterative b-tag SF workflow
+workflows["btag_ttbar_iterative_sf"] = BTagIterativeSFProcessor
 
 __all__ = ["workflows"]

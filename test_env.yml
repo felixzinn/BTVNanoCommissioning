@@ -20,3 +20,4 @@ dependencies:
   - dask-jobqueue
   - pip:
     - coffea==0.7.30
+    - hist>=2.9.0
