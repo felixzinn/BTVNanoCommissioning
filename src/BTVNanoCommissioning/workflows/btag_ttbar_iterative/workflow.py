@@ -44,7 +44,7 @@ class BaseProcessor(processor.ProcessorABC):
         year: str,
         campaign: str,
         output_directory: os.PathLike | Path,
-        isSyst: str,
+        isSyst: bool,
         isArray: bool,
         noHist: bool,
         chunksize: int,
@@ -59,6 +59,9 @@ class BaseProcessor(processor.ProcessorABC):
         self.chunksize = chunksize
 
     def postprocess(self, accumulator):
+        from BTVNanoCommissioning.helpers.xsection import xsection
+
+        accumulator["xsection"] = xsection
         return accumulator
 
 
@@ -84,10 +87,13 @@ class BTagIterativeSFProcessor(BaseProcessor):
         ParT_name: str = (
             "btagUParTAK4B" if self._year == "2024" else "btagRobustParTAK4B"
         )
+        btaggers = (ParT_name,)
+        if self._year == "2023":
+            btaggers += ("btagDeepFlavB",)
         self.histogram_config: dict[
             str, dict[str, tuple[str, ...]] | tuple[str, ...]
         ] = {
-            "btaggers": (ParT_name, "btagDeepFlavB"),
+            "btaggers": btaggers,
             "particle_properties": {
                 "dilepton": ("pt", "eta", "phi", "mass"),
                 "PuppiMET": ("pt", "phi"),
@@ -125,7 +131,6 @@ class BTagIterativeSFProcessor(BaseProcessor):
         )
 
     def process_shift(self, events, shift_name):
-        print(f"Processing shift: {shift_name}")
         dataset = events.metadata["dataset"]
         is_real_data = not hasattr(events, "genWeight")
         shift_name = "nominal" if shift_name is None else shift_name
@@ -341,7 +346,11 @@ class BTagIterativeSFProcessor(BaseProcessor):
                 is_syst=self.isSyst,
                 weights=weights,
             )
-            output["histograms"] = histograms
+            for subdict in histograms.values():
+                for key, hist in subdict.items():
+                    if type(key) is tuple:
+                        key = "_".join(key)
+                    output[key] = hist
 
         # =====================
         # write arrays
@@ -357,29 +366,30 @@ if __name__ == "__main__":
     from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
 
     filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/Run3Summer23BPixNanoAODv12/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/130X_mcRun3_2023_realistic_postBPix_v2-v3/2560000/edcc614d-8bbe-4cd5-91b8-d5c2e82bb1fc.root"
+    dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
     with uproot.open(filename) as file:
         chunk_size = 10000
         events = NanoEventsFactory.from_root(
             file,
             entry_stop=chunk_size,
             schemaclass=NanoAODSchema,
-            metadata={"dataset": "TTto2L2Nu", "filename": filename},
+            metadata={
+                "dataset": dataset_name,
+                "filename": filename,
+            },
         ).events()
 
         p = BTagIterativeSFProcessor(
             year="2023",
             campaign="Summer23",
             output_directory="./output",
-            isSyst="False",
+            isSyst=False,
             isArray=False,
             noHist=False,
             chunksize=chunk_size,
             channel="mumu",
         )
-        output = p.process(events)
-
-        histograms = output["TTto2L2Nu"]["histograms"]
-        btag = histograms["btag_scores"]
+        output = p.process(events)[dataset_name]
 
         from IPython import embed
 
