@@ -1,5 +1,9 @@
 import argparse
+import pathlib
 import warnings
+
+from matplotlib.axis import Axis
+import mplhep
 
 
 def clear_plots(directory):
@@ -28,10 +32,16 @@ parser.add_argument(
     help="Directory to save the output plots",
 )
 parser.add_argument("--lumi", type=float, help="Luminosity in pb^-1")
-args = parser.parse_args()
 
 
-if __name__ == "__main__":
+def ylog_scale(ax: Axis):
+    ax.set_yscale("log")
+    ax.autoscale()
+    mplhep.ylow(ax=ax)
+    mplhep.yscale_legend(ax=ax)
+
+
+def main(input_paths, output_path, lumi):
     import pathlib
 
     import hist as hist_lib
@@ -45,22 +55,20 @@ if __name__ == "__main__":
         plot_1D_histogram,
     )
 
-    args = parser.parse_args()
-
     # Load input files
-    input_paths = [pathlib.Path(path.strip()) for path in args.input.split(",")]
+    input_paths = [pathlib.Path(path.strip()) for path in input_paths.split(",")]
     output = {key: value for path in input_paths for key, value in load(path).items()}
     output.pop("xsection")
 
     # Set up output directory
-    output_path = pathlib.Path(args.output)
+    output_path = pathlib.Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Clear existing plots in output directory
     clear_plots(output_path)
 
     # scale with sumw and lumi
-    output = scaleSumW(output, lumi=args.lumi)
+    output = scaleSumW(output, lumi=lumi)
     # merge samples
     merge_map = sample_mergemap | {
         "mc": [sample for sample in output.keys() if "Run" not in sample],
@@ -90,10 +98,10 @@ if __name__ == "__main__":
         # plot 1D histograms, i.e. kinematics
         if mc_histograms and next(iter(mc_histograms.values())).ndim == 1:
             fig, ax = plot_1D_histogram(
-                mc_histograms=mc_histograms, data=data_hist, lumi=args.lumi
+                mc_histograms=mc_histograms, data=data_hist, lumi=lumi
             )
             fig.savefig(variable_dir / "mc_data.png")
-            ax.set_yscale("log")
+            ylog_scale(ax)
             fig.savefig(variable_dir / "mc_data_log.png")
             plt.close(fig)
 
@@ -114,15 +122,14 @@ if __name__ == "__main__":
                     mc_histograms=mc_sum,
                     data=data_hist_region,
                     suptitle=fig_suptitle,
-                    lumi=args.lumi,
+                    lumi=lumi,
                 )
                 fig.savefig(variable_dir / f"data_mc_{region}.png")
-                ax.set_yscale("log")
+                ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_log.png")
                 plt.close(fig)
 
                 # split by flavor
-                flavors = next(iter(mc_histograms.values())).axes["flav"]
                 # c=4, b=5, light=0,1,6
                 mc_flavor = {
                     "b": sum(
@@ -151,10 +158,10 @@ if __name__ == "__main__":
                     mc_histograms=mc_flavor,
                     data=data_hist_region,
                     suptitle=fig_suptitle,
-                    lumi=args.lumi,
+                    lumi=lumi,
                 )
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav.png")
-                ax.set_yscale("log")
+                ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_log.png")
                 plt.close(fig)
         else:
@@ -162,3 +169,8 @@ if __name__ == "__main__":
 
     if non_plottable:
         warnings.warn(f"Some histograms were not plottable: {non_plottable}")
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(input_paths=args.input, output_path=args.output, lumi=args.lumi)
