@@ -104,7 +104,7 @@ def define_histograms(
 
 
 def fill_histograms(
-    histograms: dict[str, Hist],
+    histograms: dict[str, dict[str | tuple[str, str], Hist]],
     events,
     systematics: Iterable[str],
     weights,
@@ -113,11 +113,13 @@ def fill_histograms(
     for systematic in systematics:
         weight = (
             weights.weight()
-            if systematic == "nominal" or systematic not in list(weights.variations)
+            if (systematic == "nominal" or systematic not in list(weights.variations))
             else weights.weight(modifier=systematic)
         )
         weight = weight.reshape((-1, 1))  # needs to be 2d (events, 1)
 
+        # NOTE: fill flattened is used to fill histograms from 2d arrays
+        # so all arrays must be 2d (events, ...)
         # fill b-tag scores
         # ================
         # tag and probe
@@ -153,17 +155,23 @@ def fill_histograms(
             # we do not need the shifts for other histograms
             # fill particle properties
             for (obj, prop), histogram in histograms["particle_properties"].items():
+                val = getattr(events[obj], prop).to_numpy()
+                if val.ndim < 2:
+                    val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
                 histogram.fill_flattened(
                     # syst=systematic,
-                    **{prop: getattr(events[obj], prop)},
+                    **{prop: val},
                     weight=weight,
                 )
 
             # fill event variables
             for var, histogram in histograms["event_variables"].items():
+                val = events[var].to_numpy()
+                if val.ndim < 2:
+                    val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
                 histogram.fill_flattened(
                     # syst=systematic,
-                    **{var: events[var]},
+                    **{var: val},
                     weight=weight,
                 )
 
