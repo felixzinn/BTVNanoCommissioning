@@ -95,9 +95,10 @@ def main(input_paths, output_path, lumi):
         }
         data_hist = collated["data"][variable]
 
+        ndim_hist = next(iter(mc_histograms.values())).ndim
         # plot 1D histograms, i.e. kinematics
-        if mc_histograms and next(iter(mc_histograms.values())).ndim == 1:
-            fig, ax = plot_1D_histogram(
+        if mc_histograms and ndim_hist == 1:
+            fig, (ax, rax) = plot_1D_histogram(
                 mc_histograms=mc_histograms, data=data_hist, lumi=lumi
             )
             fig.savefig(variable_dir / "mc_data.png")
@@ -105,20 +106,44 @@ def main(input_paths, output_path, lumi):
             fig.savefig(variable_dir / "mc_data_log.png")
             plt.close(fig)
 
-        # btag has multiple axis
-        elif "btag" in variable:
-            # sum over eta, pt, jet_index; loop over regions
-            # index is (systematic, flavor, eta, pt, region, jet_index, btag_discriminant)
+        elif ndim_hist == 2:
+            # 2d histograms have region as additional axis
+            # loop over regions
             for region in data_hist.axes["region"]:
-                data_hist_region = data_hist["nominal", sum, sum, sum, region, sum, :]
+                data_hist_region = data_hist[:, region]
 
                 # split by sample
                 mc_sum = {
-                    sample: hist["nominal", sum, sum, sum, region, sum, :]
+                    sample: hist[:, region] for sample, hist in mc_histograms.items()
+                }
+                fig_suptitle = f"{region} region"
+                fig, (ax, rax) = plot_1D_histogram(
+                    mc_histograms=mc_sum,
+                    data=data_hist_region,
+                    suptitle=fig_suptitle,
+                    lumi=lumi,
+                )
+                fig.savefig(variable_dir / f"data_mc_{region}.png")
+                ylog_scale(ax)
+                fig.savefig(variable_dir / f"data_mc_{region}_log.png")
+                plt.close(fig)
+
+        # btag has multiple axis
+        elif "btag" in variable:
+            # sum over eta, pt, jet_index; loop over regions
+            # index is (systematic, flavor, eta, pt, dR_jets, region, jet_index, btag_discriminant)
+            for region in data_hist.axes["region"]:
+                data_hist_region = data_hist[
+                    "nominal", sum, sum, sum, sum, region, sum, :
+                ]
+
+                # split by sample
+                mc_sum = {
+                    sample: hist["nominal", sum, sum, sum, sum, region, sum, :]
                     for sample, hist in mc_histograms.items()
                 }
                 fig_suptitle = f"{region} region"
-                fig, ax = plot_1D_histogram(
+                fig, (ax, rax) = plot_1D_histogram(
                     mc_histograms=mc_sum,
                     data=data_hist_region,
                     suptitle=fig_suptitle,
@@ -133,17 +158,18 @@ def main(input_paths, output_path, lumi):
                 # c=4, b=5, light=0,1,6
                 mc_flavor = {
                     "b": sum(
-                        hist["nominal", hist_lib.loc(5), sum, sum, region, sum, :]
+                        hist["nominal", hist_lib.loc(5), sum, sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "c": sum(
-                        hist["nominal", hist_lib.loc(4), sum, sum, region, sum, :]
+                        hist["nominal", hist_lib.loc(4), sum, sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "l": sum(
                         hist[
                             "nominal",
                             [hist_lib.loc(v) for v in (0, 1, 6)],
+                            sum,
                             sum,
                             sum,
                             region,
@@ -154,7 +180,7 @@ def main(input_paths, output_path, lumi):
                     ),
                 }
 
-                fig, ax = plot_1D_histogram(
+                fig, (ax, _) = plot_1D_histogram(
                     mc_histograms=mc_flavor,
                     data=data_hist_region,
                     suptitle=fig_suptitle,

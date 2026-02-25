@@ -69,7 +69,8 @@ def define_histograms(
     histograms["particle_properties"] = {
         (obj, prop): Hist(
             # axes["syst"],
-            axes[prop],
+            axes[prop],  # use the axis corresponding to the property
+            region_axis,  # some cuts are region specific
             storage=hist.storage.Weight(),
             label=f"{obj}_{prop}",
         )
@@ -93,6 +94,7 @@ def define_histograms(
             axes["flav"],
             abs_eta,
             custom_pt,
+            axes["dR_jets"],
             region_axis,
             jet_index_axis,
             axes[btagger],
@@ -143,6 +145,7 @@ def fill_histograms(
                     flav=flavor_probe,
                     eta=np.abs(probe_jet.eta),
                     pt=probe_jet.pt,
+                    dR_jets=events.dR_jets,
                     region=events[f"region_{btagger}_{i_probe_jet}"],
                     jet_index=i_probe_jet,
                     **{
@@ -158,9 +161,15 @@ def fill_histograms(
                 val = getattr(events[obj], prop).to_numpy()
                 if val.ndim < 2:
                     val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
+                region = (
+                    events[f"region_{btagger}_{i_probe_jet}"]
+                    .to_numpy()
+                    .reshape((-1, 1))
+                )
                 histogram.fill_flattened(
                     # syst=systematic,
                     **{prop: val},
+                    region=region,
                     weight=weight,
                 )
 
