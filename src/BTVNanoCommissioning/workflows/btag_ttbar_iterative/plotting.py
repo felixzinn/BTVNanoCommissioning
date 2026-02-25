@@ -35,27 +35,36 @@ def plot_1D_histogram(
     data: Hist = None,
     lumi: float = None,
     suptitle: str = None,
-) -> tuple[Figure, Axis]:
+    ax: Axis = None,
+    plot_ratio: bool = True,
+) -> tuple[Figure, tuple[Axis, Axis]]:
     with plt.rc_context(plot_style):
         fig: Figure
         ax: Axis
         rax: Axis
 
-        if data is not None:
-            fig, (ax, rax) = plt.subplots(
-                2, 1, gridspec_kw={"height_ratios": [3, 1]}, sharex=True
-            )
+        if ax is None:
+            if data is not None:
+                fig, (ax, rax) = plt.subplots(
+                    2, 1, gridspec_kw={"height_ratios": [3, 1]}, sharex=True
+                )
+            else:
+                fig, ax = plt.subplots()
+                rax = None
         else:
-            fig, ax = plt.subplots()
+            fig = ax.figure
+            plot_ratio = False  # cannot plot ratio if ax is provided
+            rax = None
         mplhep.cms.label(
             label="Preliminary",
             data=data is not None,
             loc=0,
             ax=ax,
             lumi=lumi / 1000,
-            lumi_format="{:.4f}",
+            lumi_format="{:.3f}",
             com="13.6",
         )
+        # plot MC histograms
         mplhep.histplot(
             list(mc_histograms.values()),
             ax=ax,
@@ -68,6 +77,7 @@ def plot_1D_histogram(
             # alpha=[]
         )
         if data is not None:
+            # plot data histogram
             mplhep.histplot(
                 data, ax=ax, histtype="errorbar", color="black", label="data"
             )
@@ -76,7 +86,8 @@ def plot_1D_histogram(
         # styling
         ax.legend(ncols=2, loc="upper center")
         ax.set_ylabel("Events")
-        if data is not None:
+        # if ratio plot is requested
+        if plot_ratio and rax is not None:
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     action="ignore",
@@ -104,4 +115,4 @@ def plot_1D_histogram(
         mplhep.ylow(ax=ax)
         mplhep.yscale_legend(ax=ax)
 
-    return fig, ax
+    return fig, (ax, rax)

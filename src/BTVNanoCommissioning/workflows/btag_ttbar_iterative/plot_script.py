@@ -189,6 +189,53 @@ def main(input_paths, output_path, lumi):
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav.png")
                 ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_log.png")
+
+                # add flavour ratio plots
+                fig, (ax, *raxs) = plt.subplots(
+                    4,
+                    1,
+                    gridspec_kw={"height_ratios": [3, 1, 1, 1]},
+                    sharex=True,
+                    figsize=(8, 10),
+                    constrained_layout=True,
+                )
+                plot_1D_histogram(
+                    mc_histograms=mc_flavor,
+                    data=data_hist_region,
+                    suptitle=fig_suptitle,
+                    lumi=lumi,
+                    ax=ax,
+                    plot_ratio=False,
+                )
+                ylog_scale(ax)
+                xlabel = ax.get_xlabel()
+                for i, (flav, mc_hist) in enumerate(mc_flavor.items()):
+                    rax = raxs[i]
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            action="ignore",
+                            message=".*invalid value encountered in true_divide.*",
+                        )
+                        bin_centers = mc_hist.axes[0].centers
+                        ratio = mc_hist.values() / sum(mc_flavor.values()).values()
+                        rax.plot(
+                            bin_centers,
+                            ratio,
+                            linestyle="none",
+                            marker=".",
+                            color="black",
+                        )
+                        rax.grid(which="major")
+                        rax.set_ylabel(f"{flav} / sum")
+                        rax.set_ylim(bottom=0)
+
+                raxs[-1].set_xlabel(xlabel)
+                ax.set_xlabel(None)
+                fig.savefig(variable_dir / f"data_mc_{region}_byflav_ratios.png")
+                for rax in raxs:
+                    rax.set_yscale("log")
+                    rax.autoscale()
+                fig.savefig(variable_dir / f"data_mc_{region}_byflav_ratios_log.png")
                 plt.close(fig)
         else:
             non_plottable += {variable}
