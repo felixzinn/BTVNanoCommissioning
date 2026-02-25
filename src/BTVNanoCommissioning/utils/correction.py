@@ -28,6 +28,7 @@ from BTVNanoCommissioning.helpers.func import (
     campaign_map,
 )
 from BTVNanoCommissioning.utils.AK4_parameters import correction_config as config
+from BTVNanoCommissioning.utils.AK4_parameters import get_jes_keys
 
 
 def load_SF(year, campaign, syst=False):
@@ -673,44 +674,64 @@ def JME_shifts(
             met["orig_pt"], met["orig_phi"] = nocorrmet["pt"], nocorrmet["phi"]
 
             ## JEC variations
+            jes_sources = get_jes_keys(year)
             if not isRealData and systematic != False:
-                if systematic != "JERC_split":
-                    jesuncmap = correct_map["JME"][f"{jecname}_Total_AK4PFPuppi"]
-                    jesunc = ak.unflatten(jesuncmap.evaluate(j.eta, j.pt), nj)
-                    unc_jets, unc_met = {}, {}
+                jes_sources_key = systematic.split("_")[1]
+                if jes_sources_key in jes_sources.keys():
 
-                    for var in ["up", "down"]:
-                        fac = 1.0 if var == "up" else -1.0
-                        ## JES total
-                        unc_jets[f"JES_Total{var}"] = copy.copy(nocorrjet)
-                        unc_met[f"JES_Total{var}"] = copy.copy(nocorrmet)
+                    for jes_source in jes_sources[jes_sources_key]:
+                        jesuncmap = correct_map["JME"][f"{jecname}_{jes_source}_AK4PFPuppi"]
+                        jesunc = ak.unflatten(jesuncmap.evaluate(j.eta, j.pt), nj)
+                        unc_jets, unc_met = {}, {}
+    
+                        for var, fac in zip(["up", "down"], [1.0, -1.0]):
+                            key = f"JES_{jes_source}{var}"
+                            ## JES total
+                            unc_jets[key] = copy.copy(nocorrjet)
+                            unc_met[key] = copy.copy(nocorrmet)
 
-                        unc_jets[f"JES_Total{var}"]["pt"] = ak.values_astype(
-                            jets["pt"] * (1 + fac * jesunc),
-                            np.float32,
+                            unc_jets[key]["pt"] = ak.values_astype(
+                                jets["pt"] * (1 + fac * jesunc),
+                                np.float32,
+                            )
+                            unc_jets[key]["mass"] = ak.values_astype(
+                                jets["mass"] * (1 + fac * jesunc),
+                                np.float32,
+                            )
+                            unc_met[key]["pt"] = corrected_polar_met(
+                                nocorrmet.pt,
+                                nocorrmet.phi,
+                                unc_jets[key]["pt"],
+                                jets.phi,
+                                jets.pt_raw,
+                            ).pt
+                            unc_met[key]["phi"] = corrected_polar_met(
+                                nocorrmet.pt,
+                                nocorrmet.phi,
+                                unc_jets[key]["pt"],
+                                jets.phi,
+                                jets.pt_raw,
+                            ).phi
+
+                            
+                        jets[f"JES_{jes_source}"] = ak.zip(
+                            {
+                                "up": unc_jets[f"JES_{jes_source}up"],
+                                "down": unc_jets[f"JES_{jes_source}down"],
+                            }
                         )
-                        unc_jets[f"JES_Total{var}"]["mass"] = ak.values_astype(
-                            jets["mass"] * (1 + fac * jesunc),
-                            np.float32,
+                        
+                        met[f"JES_{jes_source}"] = ak.zip(
+                            {
+                                "up": unc_met[f"JES_{jes_source}up"],
+                                "down": unc_met[f"JES_{jes_source}down"],
+                            }
                         )
-                        unc_met[f"JES_Total{var}"]["pt"] = corrected_polar_met(
-                            nocorrmet.pt,
-                            nocorrmet.phi,
-                            unc_jets[f"JES_Total{var}"]["pt"],
-                            jets.phi,
-                            jets.pt_raw,
-                        ).pt
-                        unc_met[f"JES_Total{var}"]["phi"] = corrected_polar_met(
-                            nocorrmet.pt,
-                            nocorrmet.phi,
-                            unc_jets[f"JES_Total{var}"]["pt"],
-                            jets.phi,
-                            jets.pt_raw,
-                        ).phi
+                        
+                    JERSF_input_var = get_corr_inputs(j, JERSF, var)
 
-                        JERSF_input_var = get_corr_inputs(j, JERSF, var)
-
-                        ## JER variations
+                    ## JER variations
+                    for var in ("up", "down"):
                         if sf_jersmear is None:
                             warnings.warn(
                                 "Skipping JER smearing variations because the "
@@ -752,22 +773,10 @@ def JME_shifts(
                                 jets.phi,
                                 jets.pt_raw,
                             ).phi
-                    jets["JES_Total"] = ak.zip(
-                        {
-                            "up": unc_jets["JES_Totalup"],
-                            "down": unc_jets["JES_Totaldown"],
-                        }
-                    )
                     jets["JER"] = ak.zip(
                         {
                             "up": unc_jets["JERup"],
                             "down": unc_jets["JERdown"],
-                        }
-                    )
-                    met["JES_Total"] = ak.zip(
-                        {
-                            "up": unc_met["JES_Totalup"],
-                            "down": unc_met["JES_Totaldown"],
                         }
                     )
                     met["JER"] = ak.zip(
@@ -777,7 +786,10 @@ def JME_shifts(
                         }
                     )
                 else:
-                    raise NotImplementedError
+                    raise ValueError(
+                        f"Unknown JES Source {jes_sources_key} "
+                        f"Available sources are: {list(jes_sources.keys())}"
+                    )
 
         else:
             if isRealData:
