@@ -104,7 +104,14 @@ def define_histograms(
 
     return histograms
 
-
+exclude_btv = [
+    "UParTB",
+    "robustParTB",
+    "DeepJetB",
+    "DeepJetC",
+    "DeepCSVB",
+    "DeepCSVC",
+]
 def fill_histograms(
     histograms: dict[str, dict[str | tuple[str, str], Hist]],
     events,
@@ -114,7 +121,7 @@ def fill_histograms(
     # loop over weight systematics
     for systematic in systematics:
         weight = (
-            weights.weight()
+            weights.partial_weight(exclude=exclude_btv)
             if (systematic == "nominal" or systematic not in list(weights.variations))
             else weights.weight(modifier=systematic)
         )

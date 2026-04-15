@@ -38,7 +38,7 @@ def ylog_scale(ax: Axis):
     ax.set_yscale("log")
     ax.autoscale()
     mplhep.ylow(ax=ax)
-    mplhep.yscale_legend(ax=ax)
+    mplhep.yscale_legend(ax=ax, soft_fail=True)
 
 
 def main(input_paths, output_path, lumi):
@@ -82,6 +82,8 @@ def main(input_paths, output_path, lumi):
     # Loop over variables and plot
     non_plottable = {}
     for variable, histogram in collated["mc"].items():
+        if "btag" not in variable:
+            continue
         if not isinstance(histogram, Hist):
             continue
 

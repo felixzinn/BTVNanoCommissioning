@@ -37,6 +37,27 @@ TAGGER_NAMES = {
     "btagRobustParTAK4B": "RobustParTAK4",
 }
 
+btag_wp_dict["2024_Summer24"] |= {
+    # these are the ones from 2023, as no official wps for 2024
+    "DeepFlav": {
+        "b": {
+            "No": 0.0,
+            "L": 0.048,
+            "M": 0.2435,
+            "T": 0.6563,
+            "XT": 0.7671,
+            "XXT": 0.9483,
+        },
+        "c": {
+            "No": [0.0, 0.0],
+            "L": [0.042, 0.242],  # CvL, then CvB
+            "M": [0.102, 0.328],
+            "T": [0.250, 0.267],
+            "XT": [0.371, 0.444],
+        },
+    },
+}
+
 
 class BaseProcessor(processor.ProcessorABC):
     def __init__(
@@ -87,9 +108,9 @@ class BTagIterativeSFProcessor(BaseProcessor):
         ParT_name: str = (
             "btagUParTAK4B" if self._year == "2024" else "btagRobustParTAK4B"
         )
-        btaggers = (ParT_name,)
-        if self._year == "2023":
-            btaggers += ("btagDeepFlavB",)
+        btaggers = (ParT_name, "btagDeepFlavB")
+        # if self._year == "2023":
+        #     btaggers += ("btagDeepFlavB",)
         self.histogram_config: dict[
             str, dict[str, tuple[str, ...]] | tuple[str, ...]
         ] = {
@@ -97,7 +118,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
             "particle_properties": {
                 "dilepton": ("pt", "eta", "phi", "mass"),
                 "PuppiMET": ("pt", "phi"),
-                "SelJet": ("pt", "eta", "phi", "btagDeepFlavB", ParT_name),
+                "SelJet": ("pt", "eta", "phi", *btaggers),
             },
             "event_variables": ("dR_jets", "njet"),
         }
@@ -282,7 +303,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
             return {dataset: output}
 
         pruned_events["SelJet"] = good_jets[event_level_mask][:, :2]
-        pruned_events["njet"] = ak.count(good_jets[event_level_mask].pt, axis=1)
+        pruned_events["njet"] = ak.count(pruned_events.SelJet.pt, axis=1)
         pruned_events["dR_jets"] = pruned_events.SelJet[:, 0].delta_r(
             pruned_events.SelJet[:, 1]
         )
@@ -303,6 +324,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
         # # tag and probe
         # # =====================
 
+        btag_wpdict_year = btag_wp_dict[f"{self._year}_{self._campaign}"]
         for i_tag_jet, i_probe_jet in [(0, 1), (1, 0)]:
             tag_jet = pruned_events.SelJet[:, i_tag_jet]
             for btagger in self.histogram_config["btaggers"]:
@@ -311,9 +333,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
 
                 # assign to regions based on b-tag of tag jet
                 tagger_name = TAGGER_NAMES[btagger]
-                btag_dict = btag_wp_dict[f"{self._year}_{self._campaign}"][tagger_name][
-                    "b"
-                ]
+                btag_dict = btag_wpdict_year[tagger_name]["b"]
                 tag_jet_cut = {
                     "HF": b_score_tag >= btag_dict["M"],
                     "LF": b_score_tag < btag_dict["L"],
@@ -365,10 +385,10 @@ if __name__ == "__main__":
     import uproot
     from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
 
-    filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/Run3Summer23BPixNanoAODv12/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/130X_mcRun3_2023_realistic_postBPix_v2-v3/2560000/edcc614d-8bbe-4cd5-91b8-d5c2e82bb1fc.root"
+    filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/RunIII2024Summer24NanoAODv15/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/150X_mcRun3_2024_realistic_v2-v3/2810000/f60b4a6c-2801-43b0-b542-6d933a71a396.root"
     dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
     with uproot.open(filename) as file:
-        chunk_size = 10000
+        chunk_size = 1000
         events = NanoEventsFactory.from_root(
             file,
             entry_stop=chunk_size,
@@ -380,9 +400,10 @@ if __name__ == "__main__":
         ).events()
 
         p = BTagIterativeSFProcessor(
-            year="2023",
-            campaign="Summer23",
+            year="2024",
+            campaign="Summer24",
             output_directory="./output",
+            # isSyst="JERC_full",
             isSyst=False,
             isArray=False,
             noHist=False,
