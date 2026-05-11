@@ -25,4 +25,56 @@ def get_histograms(axes, **kwargs):
         hists[f"{i}_dxy"] = Hist.Hist(axes["syst"], axes["dxy"], Hist.storage.Weight())
         hists[f"{i}_dz"] = Hist.Hist(axes["syst"], axes["dz"], Hist.storage.Weight())
 
+    for jet_index in range(2):
+        hists[f"btagUParTAK4B_{jet_index}"] = Hist.Hist(
+            axes["syst"],
+            axes["flav"],
+            Hist.axis.Regular(
+                100,
+                0.0,
+                1,
+                name="discr",
+                label=f"btagUParTAK4B, jet {jet_index}",
+            ),
+            Hist.storage.Weight(),
+        )
+        hists[f"btagUParTAK4B_noSF_{jet_index}"] = Hist.Hist(
+            axes["syst"],
+            axes["flav"],
+            Hist.axis.Regular(
+                100,
+                0.0,
+                1,
+                name="discr",
+                label=f"btagUParTAK4B (no SF), jet {jet_index}",
+            ),
+            Hist.storage.Weight(),
+        )
+
+        for pt_bin in [(0, 50), (50, 80), (80, "inf")]:
+            hists[f"btagUParTAK4B_pt{pt_bin[0]}to{pt_bin[1]}_{jet_index}"] = Hist.Hist(
+                axes["syst"],
+                axes["flav"],
+                Hist.axis.Regular(
+                    100,
+                    0.0,
+                    1,
+                    name="discr",
+                    label=f"btagUParTAK4B, jet {jet_index} pt {pt_bin[0]} to {pt_bin[1]}",
+                ),
+                Hist.storage.Weight(),
+            )
+            hists[f"btagUParTAK4B_pt{pt_bin[0]}to{pt_bin[1]}_noSF_{jet_index}"] = Hist.Hist(
+                axes["syst"],
+                axes["flav"],
+                Hist.axis.Regular(
+                    100,
+                    0.0,
+                    1,
+                    name="discr",
+                    label=f"btagUParTAK4B (no SF), jet {jet_index} pt {pt_bin[0]} to {pt_bin[1]}",
+                ),
+                Hist.storage.Weight(),
+            )
+
     return hists
