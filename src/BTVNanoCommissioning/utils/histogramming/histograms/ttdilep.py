@@ -9,6 +9,57 @@ def get_histograms(axes, **kwargs):
             axes["syst"], axes["flav"], axes["dr"], Hist.storage.Weight()
         )
 
+        hists[f"btagUParTAK4B_{i}"] = Hist.Hist(
+            axes["syst"],
+            axes["flav"],
+            Hist.axis.Regular(
+                100,
+                0.0,
+                1,
+                name="discr",
+                label=f"btagUParTAK4B, jet {i}",
+            ),
+            Hist.storage.Weight(),
+        )
+        hists[f"btagUParTAK4B_noSF_{i}"] = Hist.Hist(
+            axes["syst"],
+            axes["flav"],
+            Hist.axis.Regular(
+                100,
+                0.0,
+                1,
+                name="discr",
+                label=f"btagUParTAK4B (no SF), jet {i}",
+            ),
+            Hist.storage.Weight(),
+        )
+
+        for pt_bin in [(0, 50), (50, 80), (80, "inf")]:
+            hists[f"btagUParTAK4B_pt{pt_bin[0]}to{pt_bin[1]}_{i}"] = Hist.Hist(
+                axes["syst"],
+                axes["flav"],
+                Hist.axis.Regular(
+                    100,
+                    0.0,
+                    1,
+                    name="discr",
+                    label=f"btagUParTAK4B, jet {i} pt {pt_bin[0]} to {pt_bin[1]}",
+                ),
+                Hist.storage.Weight(),
+            )
+            hists[f"btagUParTAK4B_pt{pt_bin[0]}to{pt_bin[1]}_noSF_{i}"] = Hist.Hist(
+                axes["syst"],
+                axes["flav"],
+                Hist.axis.Regular(
+                    100,
+                    0.0,
+                    1,
+                    name="discr",
+                    label=f"btagUParTAK4B (no SF), jet {i} pt {pt_bin[0]} to {pt_bin[1]}",
+                ),
+                Hist.storage.Weight(),
+            )
+
     for i in ["mu", "ele"]:
         if i == "mu":
             hists[f"{i}_pfRelIso04_all"] = Hist.Hist(

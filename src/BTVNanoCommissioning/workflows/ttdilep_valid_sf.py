@@ -78,7 +78,7 @@ class NanoProcessor(processor.ProcessorABC):
             output = histogrammer(
                 events.Jet.fields,
                 obj_list=["mu", "ele", "jet0", "jet1"],
-                hist_collections=["common", "fourvec", "ttdilep"],
+                hist_collections=["fourvec", "ttdilep"],  # "common", 
             )
 
         if shift_name is None:
@@ -241,3 +241,29 @@ class NanoProcessor(processor.ProcessorABC):
 
     def postprocess(self, accumulator):
         return accumulator
+
+
+if __name__ == "__main__":
+    import uproot
+    from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
+
+    filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/RunIII2024Summer24NanoAODv15/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/BTVNanoV15_150X_mcRun3_2024_realistic_v2-v1/90001/bf7cfb40-cf7c-459c-8740-ef103868eba7.root"
+    dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
+    with uproot.open(filename) as file:
+        chunksize = 1000
+        events = NanoEventsFactory.from_root(
+            file,
+            entry_stop=chunksize,
+            schemaclass=NanoAODSchema,
+            metadata={"dataset": dataset_name, "filename": filename},
+        ).events()
+
+        p = NanoProcessor(
+            year="2024",
+            campaign="Summer24",
+            isSyst=False,
+            isArray=False,
+            noHist=False,
+            chunksize=chunksize,
+        )
+        output = p.process(events)[dataset_name]

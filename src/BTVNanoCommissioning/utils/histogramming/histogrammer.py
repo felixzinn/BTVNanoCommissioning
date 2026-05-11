@@ -340,12 +340,41 @@ def histo_writter(pruned_ev, output, weights, systematics, isSyst, SF_map):
                             flav, seljet = flavs[:, i], seljets[:, i]
                         else:
                             flav, seljet = flavs, seljets
-                        h.fill(
-                            syst=syst,
-                            flav=flav,
-                            discr=seljet[histname.replace(f"_{i}", "")],
-                            weight=weight,
-                        )
+                        if "pt" in histname:
+                            # histograms binned in jet pt like for iterative b-tag SFs
+                            tagger, ptbins, *_ = histname.split("_")
+                            low, up = [
+                                float(x) for x in ptbins.replace("pt", "").split("to")
+                            ]
+                            pt_mask = (seljet.pt >= low) & (seljet.pt < up)
+                            if "noSF" in histname:
+                                weight_masked = weights.partial_weight(
+                                    exclude=[tagger]
+                                )[pt_mask]
+                            else:
+                                weight_masked = weight[pt_mask]
+                            h.fill(
+                                syst=syst[pt_mask],
+                                flav=flav[pt_mask],
+                                discr=seljet[tagger][pt_mask],
+                                weight=weight_masked,
+                            )
+                        else:
+                            tagger, *_ = histname.split("_")
+                            if "noSF" in histname:
+                                h.fill(
+                                    syst=syst,
+                                    flav=flav,
+                                    discr=seljet[tagger],
+                                    weight=weights.partial_weight(exclude=[tagger]),   
+                                )
+                            else:
+                                h.fill(
+                                    syst=syst,
+                                    flav=flav,
+                                    discr=seljet[tagger],
+                                    weight=weight,
+                                )
                 elif histname in seljets.fields:
                     # No jet index suffix (nj=1) - fill directly
                     discr = seljets[histname]

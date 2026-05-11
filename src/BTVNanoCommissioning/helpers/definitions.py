@@ -185,7 +185,7 @@ def axes_name(var):
         unit = " $d_{z}$ [cm]"
     elif "pfRelIso" in var:
         unit = " Rel. Iso"
-    elif "btag" in var:
+    if "btag" in var:
         unit = "Jet"
         ## Negative tagger
         if "Neg" in var:

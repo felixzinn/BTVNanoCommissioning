@@ -194,9 +194,9 @@ def _get_discriminators(axes, **kwargs):
                     Hist.storage.Weight(),
                 )
 
-        for i in range(njet):
+        for i in range(njet + 1):
             if "btag" in d or "ProbaN" == d:
-                hists[d] = Hist.Hist(
+                hists[f"{d}_{i}"] = Hist.Hist(
                     *common_axes,
                     disc_axes["btag"],
                     Hist.storage.Weight(),

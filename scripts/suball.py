@@ -153,7 +153,7 @@ if __name__ == "__main__":
         # args.scheme = "test"
 
     # Check lumiMask exists and replace the Validation
-    input_lumi_json = correction_config[args.campaign]["DC"]
+    input_lumi_json = correction_config[args.campaign]["default"]["DC"]
     if args.campaign != "prompt_dataMC" and not os.path.exists(
         f"src/BTVNanoCommissioning/data/DC/{input_lumi_json}"
     ):
@@ -221,7 +221,7 @@ if __name__ == "__main__":
                 json_file = f"metadata/{args.campaign}/{types}_{args.campaign}_{args.year}_{wf}.json"
 
                 # Check if dataset needs refreshing because of age
-                if should_refresh_dataset(json_file):
+                if should_refresh_dataset(json_file, max_age_minutes=60*24*7):
                     print(f"Refreshing dataset: {json_file}")
                     fetch_cmd = f"python scripts/fetch.py -c {args.campaign} --from_workflow {wf} --DAS_campaign {args.DAS_campaign} --year {args.year} {overwrite} --skipvalidation --overwrite --executor futures"
                     os.system(fetch_cmd)
@@ -259,6 +259,9 @@ if __name__ == "__main__":
                     ]:
                         if value == True:
                             runner_config += f" --{key}"
+                    elif key == "skip_structure_validation":
+                        if value == True:
+                            runner_config += f" --skip-structure-validation"
                     elif value is not None:
                         if key == "limit":
                             runner_config += f" --{key}={value}"

@@ -307,6 +307,9 @@ correction_config = {
                 "Run2024I": "Summer24Prompt24_V2",
             },
             "jetveto": {"Summer24Prompt24_RunBCDEFGHI_V1": "jetvetomap"},
+            "BTV": {
+                "btag": "btagging.json.gz",
+            },
             "MUO": {
                 "mu_ID": "NUM_TightID_DEN_TrackerMuons",
                 "mu_Iso": "NUM_TightPFIso_DEN_TightID",

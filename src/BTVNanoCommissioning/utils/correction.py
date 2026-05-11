@@ -131,9 +131,9 @@ def load_SF(year, campaign, selMod="default", syst=False):
                 ".json.gz"
             ):
                 correct_map["btag"] = correctionlib.CorrectionSet.from_file(
-                    importlib.resources.path(
-                        f"BTVNanoCommissioning.data.BTV.{campaign}", filename
-                    )
+                    str(importlib.resources.path(
+                        f"BTVNanoCommissioning.data.BTV.{campaign}", config[campaign]["default"]["BTV"]["btag"],
+                    ))
                 )
             if "ctag" in conf["BTV"].keys() and conf["BTV"]["ctag"].endswith(
                 ".json.gz"
@@ -143,47 +143,47 @@ def load_SF(year, campaign, selMod="default", syst=False):
                         f"BTVNanoCommissioning.data.BTV.{campaign}", filename
                     )
                 )
-            _btv_cvmfs = _cvmfs_dir(campaign, "BTV")
-            if os.path.exists(
-                f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/"
-            ):
-                correct_map["btag"] = correctionlib.CorrectionSet.from_file(
-                    f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/btagging.json.gz"
-                )
-                correct_map["ctag"] = correctionlib.CorrectionSet.from_file(
-                    f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/ctagging.json.gz"
-                )
-            else:
-                correct_map["btag"] = {}
-                correct_map["ctag"] = {}
-                correct_map["BTV_cfg"] = conf["BTV"]
-                _btag_path = f"BTVNanoCommissioning.data.BTV.{campaign}"
-                for tagger in conf["BTV"]:
-                    with importlib.resources.path(
-                        _btag_path, conf["BTV"][tagger]
-                    ) as filename:
-                        if "B" in tagger:
-                            if filename.endswith(".json.gz"):
-                                correct_map["btag"] = (
-                                    correctionlib.CorrectionSet.from_file(filename)
-                                )
-                            else:
-                                correct_map["btag"][tagger] = BTagScaleFactor(
-                                    filename,
-                                    BTagScaleFactor.RESHAPE,
-                                    methods="iterativefit,iterativefit,iterativefit",
-                                )
-                        else:
-                            if filename.endswith(".json.gz"):
-                                correct_map["ctag"] = (
-                                    correctionlib.CorrectionSet.from_file(filename)
-                                )
-                            else:
-                                correct_map["ctag"][tagger] = BTagScaleFactor(
-                                    filename,
-                                    BTagScaleFactor.RESHAPE,
-                                    methods="iterativefit,iterativefit,iterativefit",
-                                )
+            # _btv_cvmfs = _cvmfs_dir(campaign, "BTV")
+            # if os.path.exists(
+            #     f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/"
+            # ):
+            #     correct_map["btag"] = correctionlib.CorrectionSet.from_file(
+            #         f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/btagging.json.gz"
+            #     )
+            #     correct_map["ctag"] = correctionlib.CorrectionSet.from_file(
+            #         f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{_btv_cvmfs}/latest/ctagging.json.gz"
+            #     )
+            # else:
+            #     correct_map["btag"] = {}
+            #     correct_map["ctag"] = {}
+            #     correct_map["BTV_cfg"] = conf["BTV"]
+            #     _btag_path = f"BTVNanoCommissioning.data.BTV.{campaign}"
+            #     for tagger in conf["BTV"]:
+            #         with importlib.resources.path(
+            #             _btag_path, conf["BTV"][tagger]
+            #         ) as filename:
+            #             if "B" in tagger:
+            #                 if filename.endswith(".json.gz"):
+            #                     correct_map["btag"] = (
+            #                         correctionlib.CorrectionSet.from_file(filename)
+            #                     )
+            #                 else:
+            #                     correct_map["btag"][tagger] = BTagScaleFactor(
+            #                         filename,
+            #                         BTagScaleFactor.RESHAPE,
+            #                         methods="iterativefit,iterativefit,iterativefit",
+            #                     )
+            #             else:
+            #                 if filename.endswith(".json.gz"):
+            #                     correct_map["ctag"] = (
+            #                         correctionlib.CorrectionSet.from_file(filename)
+            #                     )
+            #                 else:
+            #                     correct_map["ctag"][tagger] = BTagScaleFactor(
+            #                         filename,
+            #                         BTagScaleFactor.RESHAPE,
+            #                         methods="iterativefit,iterativefit,iterativefit",
+            #                     )
 
         ## lepton SFs
         elif SF == "MUO" or SF == "EGM":
@@ -2075,12 +2075,12 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
         for nj in range(ak.num(alljet.pt)[0]):
             jet = alljet[:, nj]
             masknone = ak.is_none(jet.pt)
-            jet.btagDeepFlavCvL = ak.fill_none(jet.btagDeepFlavCvL, 0.0)
-            jet.btagDeepFlavCvB = ak.fill_none(jet.btagDeepFlavCvB, 0.0)
-            jet.btagDeepCvL = ak.fill_none(jet.btagDeepCvL, 0.0)
-            jet.btagDeepCvB = ak.fill_none(jet.btagDeepCvB, 0.0)
+            # jet.btagDeepFlavCvL = ak.fill_none(jet.btagDeepFlavCvL, 0.0)
+            # jet.btagDeepFlavCvB = ak.fill_none(jet.btagDeepFlavCvB, 0.0)
+            # jet.btagDeepCvL = ak.fill_none(jet.btagDeepCvL, 0.0)
+            # jet.btagDeepCvB = ak.fill_none(jet.btagDeepCvB, 0.0)
             jet.hadronFlavour = ak.fill_none(jet.hadronFlavour, 0)
-            if "correctionlib" in str(type(correct_map["ctag"])):
+            if "correctionlib" in str(type(correct_map.get("ctag", None))):
                 if SFtype == "DeepJetC":
                     tmp_sfs = np.where(
                         masknone,
@@ -2144,7 +2144,56 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
                             jet.btagDeepCvB,
                         ),
                     )
-            if "correctionlib" in str(type(correct_map["btag"])):
+            if "correctionlib" in str(type(correct_map.get("btag", None))):
+                abs_jet_eta = np.clip(np.abs(jet.eta), 0.0, 2.4)
+                if SFtype == "btagUParTAK4B":
+                    key = "UParTAK4B_shape"
+                    btag_value = jet.btagUParTAK4B
+                    masknone = np.where(btag_value < 0.0, True, masknone)  # if btag value is invalid, do not apply sf
+                    btag_value = np.where(masknone, 0.0, btag_value)  # set btag value to 0 if it is invalid to avoid error from correctionlib
+                    # only flavour = 0,5 available
+                    flavour = jet.hadronFlavour
+                    masknone = np.where(
+                        (flavour != 0) & (flavour != 5),
+                        True,
+                        masknone,
+                    )
+                    flavour = np.where(masknone, 0, flavour)  # set flavour to 0 if it is invalid to avoid error from correctionlib
+                    tmp_sfs = np.where(
+                        masknone,
+                        1.0,
+                        correct_map["btag"][key].evaluate(
+                            "nominal",
+                            flavour,
+                            abs_jet_eta,
+                            jet.pt,
+                            btag_value,
+                        ),
+                    )
+                    if syst:
+                        tmp_sfs_up = np.where(
+                            masknone,
+                            1.0,
+                            correct_map["btag"][key].evaluate(
+                                f"up_{systlist[i]}",
+                                jet.hadronFlavour,
+                                abs_jet_eta,
+                                jet.pt,
+                                btag_value
+                            ),
+                        )
+                        tmp_sfs_down = np.where(
+                            masknone,
+                            1.0,
+                            correct_map["btag"][key].evaluate(
+                                f"down_{systlist[i]}",
+                                jet.hadronFlavour,
+                                abs_jet_eta,
+                                jet.pt,
+                                btag_value
+                            ),
+                        )
+
                 if SFtype == "DeepJetB":
                     tmp_sfs = np.where(
                         masknone,
@@ -3257,11 +3306,13 @@ def weight_manager(pruned_ev, SF_map, isSyst):
             muSFs(pruned_ev.SelMuon, SF_map, weights, syst_wei, False)
         if "EGM" in SF_map.keys() and "SelElectron" in pruned_ev.fields:
             eleSFs(pruned_ev.SelElectron, SF_map, weights, syst_wei, False)
-        if "BTV" in SF_map.keys() and "SelJet" in pruned_ev.fields:
-            btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetC", syst_wei)
-            btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetB", syst_wei)
-            btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVB", syst_wei)
-            btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVC", syst_wei)
+        if "btag" in SF_map.keys() and "SelJet" in pruned_ev.fields:
+            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetC", syst_wei)
+            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetB", syst_wei)
+            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVB", syst_wei)
+            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVC", syst_wei)
+            if "btagUParTAK4B" in pruned_ev.SelJet.fields:
+                btagSFs(pruned_ev.SelJet, SF_map, weights, "btagUParTAK4B", syst_wei)
 
     return weights
 
