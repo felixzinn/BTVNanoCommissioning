@@ -251,11 +251,12 @@ def main(args):
             return 1
 
         # Skip missing and empty hists
+        check_flow = args.flow in ("show", "sum")
         if discr not in collated["mc"].keys() or discr not in collated["data"].keys():
             print(discr, "not in files, skipping")
             continue
-        elif (collated["mc"][discr].values() == 0).all() or (
-            collated["data"][discr].values() == 0
+        elif (collated["mc"][discr].values(flow=check_flow) == 0).all() or (
+            collated["data"][discr].values(flow=check_flow) == 0
         ).all():
             print(discr, "is empty, skipping")
             continue
@@ -584,7 +585,7 @@ def main(args):
                 sort="y",  # sort by yield
             )
             hmc = collated["mc"][discr][allaxis]
-            MCerrorband(hmc, ax=ax)
+            MCerrorband(hmc, ax=ax, flow=args.flow)
             rax = plotratio(
                 collated["data"][discr][allaxis],
                 hmc,

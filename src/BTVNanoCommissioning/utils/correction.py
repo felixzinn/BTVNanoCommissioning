@@ -24,7 +24,6 @@ except Exception:
 
 from coffea.lookup_tools import extractor, txt_converters, rochester_lookup
 from coffea.lumi_tools import LumiMask
-from coffea.jetmet_tools.CorrectedMETFactory import corrected_polar_met
 from coffea.analysis_tools import Weights
 from coffea.btag_tools import BTagScaleFactor
 
@@ -123,9 +122,14 @@ def load_SF(year, campaign, selMod="default", syst=False):
                         f"/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/{_lum_cvmfs}/latest/puWeights.json.gz"
                     )
                 except FileNotFoundError:
-                    correct_map["LUM"] = correctionlib.CorrectionSet.from_file(
-                        f"/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/{_lum_cvmfs}/latest/puWeights_BCDEFGHI.json.gz"
-                    )
+                    try:
+                        correct_map["LUM"] = correctionlib.CorrectionSet.from_file(
+                            f"/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/{_lum_cvmfs}/latest/puWeights_BCDEFGHI.json.gz"
+                        )
+                    except FileNotFoundError:
+                        correct_map["LUM"] = correctionlib.CorrectionSet.from_file(
+                            f"/cvmfs/cms-griddata.cern.ch/cat/metadata/LUM/{_lum_cvmfs}/prelim/puWeights_2025pp_Golden_Summer24_25ns_69200ub.json.gz"
+                        )
             ## Otherwise custom files
             else:
                 _pu_path = f"BTVNanoCommissioning.data.LUM.{campaign}"
@@ -510,7 +514,7 @@ def load_lumi(campaign):
     FileNotFoundError: If the luminosity mask file does not exist.
     """
 
-    _lumi_path = f'/cvmfs/cms-griddata.cern.ch/cat/metadata/DC/Collisions{campaign[-2:]}/latest/{config[campaign]["default"]["DC"]}'
+    _lumi_path = f"/cvmfs/cms-griddata.cern.ch/cat/metadata/DC/Collisions{campaign[-2:]}/latest/{config[campaign]['default']['DC']}"
     if os.path.exists(_lumi_path):
         return LumiMask(_lumi_path)
     else:
@@ -810,8 +814,7 @@ def _infer_jec_jet_algo(correct_map, jecname):
         return available[0].replace(f"{jecname}_L1L2L3Res_", "")
 
     raise KeyError(
-        f"No L1L2L3Res JEC key found for '{jecname}'. "
-        f"Available matches: {available}"
+        f"No L1L2L3Res JEC key found for '{jecname}'. Available matches: {available}"
     )
 
 
@@ -3219,9 +3222,10 @@ def _load_frag_decay_maps():
             )
 
             with uproot.open(str(bfrag_path)) as fb, uproot.open(str(cfrag_path)) as fc:
-                with uproot.open(str(bdec_path)) as fbdec, uproot.open(
-                    str(cdec_path)
-                ) as fcdec:
+                with (
+                    uproot.open(str(bdec_path)) as fbdec,
+                    uproot.open(str(cdec_path)) as fcdec,
+                ):
                     payload = {
                         "b_bl_up": _tgraph_fn(fb["fragCP5BLup_smooth"]),
                         "b_bl_dn": _tgraph_fn(fb["fragCP5BLdown_smooth"]),
