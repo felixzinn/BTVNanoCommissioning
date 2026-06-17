@@ -37,7 +37,7 @@ parser.add_argument("--lumi", type=float, help="Luminosity in pb^-1")
 def ylog_scale(ax: Axis):
     ax.set_yscale("log")
     ax.autoscale()
-    mplhep.ylow(ax=ax)
+    mplhep.set_ylow(ax=ax)
     mplhep.yscale_legend(ax=ax, soft_fail=True)
 
 
@@ -70,6 +70,7 @@ def main(input_paths, output_path, lumi):
     # scale with sumw and lumi
     output = scaleSumW(output, lumi=lumi)
     # merge samples
+    sample_mergemap.pop("Z+jets", None)  # Z+jets and DY are double
     merge_map = sample_mergemap | {
         "mc": [sample for sample in output.keys() if "Run" not in sample],
         "data": [sample for sample in output.keys() if "Run" in sample],
@@ -82,8 +83,8 @@ def main(input_paths, output_path, lumi):
     # Loop over variables and plot
     non_plottable = {}
     for variable, histogram in collated["mc"].items():
-        if "btag" not in variable:
-            continue
+        # if "btag" not in variable:
+        #     continue
         if not isinstance(histogram, Hist):
             continue
 

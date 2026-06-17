@@ -7,29 +7,41 @@ import luigi.util
 from BTVNanoCommissioning.tasks.processing import ProcessBTagIterative
 from BTVNanoCommissioning.workflows.btag_ttbar_iterative.plot_script import main
 
+law.contrib.load("wlcg")
 
-@luigi.util.inherits(ProcessBTagIterative)
+
+@luigi.util.requires(ProcessBTagIterative)
 class PlotBtagIterative(law.Task):
-    lumi = luigi.FloatParameter(
-        description="Luminosity in pb^-1 for scaling",
-    )
-
-    def requires(self):
-        return ProcessBTagIterative.req(self)
-
     def output(self):
-        return law.LocalDirectoryTarget(
-            os.path.join(
-                os.environ.get("BTV_OUTPUT_DIR", "."),
-                self.version,
-                self.__class__.__name__,
-            )
-        )
+        return {
+            "local": law.LocalDirectoryTarget(
+                os.path.join(
+                    os.environ.get("BTV_OUTPUT_DIR", "."),
+                    self.version,
+                    self.__class__.__name__,
+                )
+            ),
+            "eos": law.wlcg.WLCGDirectoryTarget(
+                os.path.join(
+                    "f/fzinn/BTV/btag_sf",
+                    self.version,
+                    self.__class__.__name__,
+                ),
+                fs="wlcg_fs",
+            ),
+        }
 
+    @law.decorator.safe_output
     def run(self):
-        input_files = ",".join(inp.abspath for inp in self.input())
+        inp = self.input()
+        out = self.output()
+        input_files = ",".join(target.abspath for target in inp["coffea"])
+        lumi = sum(float(target["lumi"].load()) for target in inp["lumi"])
         main(
             input_paths=input_files,
-            output_path=self.output().path,
-            lumi=self.lumi,
+            output_path=out["local"].path,
+            lumi=lumi,
         )
+
+        out["eos"].copy_from_local(out["local"].path)
+        

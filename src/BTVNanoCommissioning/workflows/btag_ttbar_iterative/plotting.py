@@ -56,7 +56,7 @@ def plot_1D_histogram(
             plot_ratio = False  # cannot plot ratio if ax is provided
             rax = None
         mplhep.cms.label(
-            label="Preliminary",
+            text="Preliminary",
             data=data is not None,
             loc=0,
             ax=ax,
@@ -112,7 +112,7 @@ def plot_1D_histogram(
 
         # style adjustments
         # NOTE: should switch to mplhep >= v1.0.0.rc4
-        mplhep.ylow(ax=ax)
+        mplhep.set_ylow(ax=ax)
         mplhep.yscale_legend(ax=ax)
 
     return fig, (ax, rax)

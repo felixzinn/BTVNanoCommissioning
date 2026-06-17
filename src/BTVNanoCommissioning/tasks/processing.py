@@ -7,6 +7,9 @@ import luigi.util
 
 from BTVNanoCommissioning.tasks.base import baseparameters
 from BTVNanoCommissioning.tasks.datasets import FetchDatasets
+from BTVNanoCommissioning.tasks.utils import get_lumi
+
+law.contrib.load("coffea")
 
 
 class processingparameters(luigi.Config):
@@ -38,10 +41,26 @@ class processingparameters(luigi.Config):
         choices=["False", "all", "weight_only", "JERC_split", "JP_MC"],
         description="Whether to run systematic variations",
     )
+    skip_structure_validation = luigi.BoolParameter(
+        default=False,
+        description="Whether to skip structure validation in runner.py",
+    )
 
 
 @luigi.util.inherits(processingparameters, baseparameters)
-class ProcessDatasets(law.Task):
+class ProcessBase(law.Task):
+    @property
+    def output_base(self):
+        return os.path.join(
+            os.environ.get("BTV_OUTPUT_DIR", "."),
+            self.version,
+            self.__class__.__name__,
+            # self.campaign,
+            # self.workflow,
+        )
+
+
+class ProcessDatasets(ProcessBase):
     json = luigi.Parameter(
         description="Path to JSON file with dataset and file locations",
     )
@@ -83,6 +102,8 @@ class ProcessDatasets(law.Task):
             cmd += ["--limit", str(self.limit)]
         if self.max_chunks is not None:
             cmd += ["--max", str(self.max_chunks)]
+        if self.skip_structure_validation:
+            cmd += ["--skip-structure-validation"]
 
         subprocess.run(
             cmd,
@@ -90,18 +111,14 @@ class ProcessDatasets(law.Task):
         )
 
     @property
-    def output_base(self):
-        return os.path.join(
-            os.environ.get("BTV_OUTPUT_DIR", "."),
-            self.version,
-            self.__class__.__name__,
-        )
+    def output_file_base(self):
+        return os.path.splitext(os.path.basename(self.output_file))[0]
 
     def output(self):
         return law.LocalFileTarget(
             os.path.join(
                 self.output_base,
-                os.path.splitext(os.path.basename(self.output_file))[0],
+                self.output_file_base,
                 self.output_file,
             )
         )
@@ -114,7 +131,42 @@ class ProcessDatasets(law.Task):
                 break
             file_name.append(item)
         file_name = os.path.join(*reversed(file_name))
-        return FetchDatasets.req(self, json=f"{file_name}.json", definition=f"{stem}.txt")
+        return FetchDatasets.req(
+            self, json=f"{file_name}.json", definition=f"{stem}.txt"
+        )
+
+
+@luigi.util.requires(ProcessDatasets)
+class GetLuminosity(ProcessBase):
+    def output(self):
+        output_file_base = self.requires().output_file_base
+        return {
+            "json": law.LocalFileTarget(
+                os.path.join(
+                    self.output_base,
+                    f"{output_file_base}_lumi.json",
+                )
+            ),
+            "lumi": law.LocalFileTarget(
+                os.path.join(
+                    self.output_base,
+                    f"{output_file_base}_lumi.txt",
+                )
+            ),
+        }
+
+    def run(self):
+        coffea_output = self.input().load()
+        # coffea_output.pop("xsection", None)
+        json_file = self.output()["json"]
+        json_file.touch()
+        lumi = get_lumi(
+            coffea_output=coffea_output,
+            json_file=json_file.path,
+            year=self.year,
+        )
+        with self.output()["lumi"].open("w") as f:
+            f.write(f"{lumi}\n")
 
 
 @luigi.util.inherits(processingparameters, baseparameters)
@@ -125,10 +177,18 @@ class ProcessBTagIterative(law.WrapperTask):
     )
 
     def requires(self):
-        reqs = []
+        reqs = {"lumi": [], "coffea": []}
         for dataset_file in self.definition_files:
-            stem = os.path.splitext(dataset_file)[0]
-            reqs.append(
+            stem = os.path.basename(os.path.splitext(dataset_file)[0])
+            if "data" in stem:
+                reqs["lumi"].append(
+                    GetLuminosity.req(
+                        self,
+                        json=f"{stem}.json",
+                        output_file=f"{os.path.basename(stem)}_hists.coffea",
+                    )
+                )
+            reqs["coffea"].append(
                 ProcessDatasets.req(
                     self,
                     json=f"{stem}.json",
