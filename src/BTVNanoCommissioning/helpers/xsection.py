@@ -533,6 +533,18 @@ xsection = [
     # Binned by mass: NLO                                                     #
     # ----------------------------------------------------------------------- #
     {
+        "process_name": "DYto2E_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
+        "cross_section": "6744",
+        "equivalent_lumi": "0.1249",
+        "comments": "xsdb",
+    },
+    {
+        "process_name": "DYto2Tau_Bin-MLL-10to50_TuneCP5_13p6TeV_powheg-pythia8",
+        "cross_section": "6744",
+        "equivalent_lumi": "0.1251",
+        "comments": "xsdb",
+    },
+    {
         "id": "64204f0229461764a903bf9b",
         "process_name": "DYto2L-2Jets_MLL-10to50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "cross_section": "19317.5",
