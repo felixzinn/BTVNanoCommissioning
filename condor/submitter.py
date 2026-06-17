@@ -1,4 +1,4 @@
-import os
+import os, sys
 import json
 import shutil
 import tarfile
@@ -23,6 +23,7 @@ def get_condor_submitter_parser(parser):
         required=True,
     )
     parser.add_argument(
+        "-n",
         "--condorFileSize",
         type=int,
         default=50,
@@ -37,6 +38,11 @@ def get_condor_submitter_parser(parser):
         "--remoteRepo",
         default=None,
         help="If specified, access BTVNanoCommsioning from a remote tarball (downloaded via https), instead of from a transferred sandbox",
+    )
+    parser.add_argument(
+        "--jobqueue",
+        default="tomorrow",
+        help="JobFlavour for condor@lxplus. E.g. microcentury, longlunch, workday, tomorrow",
     )
     return parser
 
@@ -61,6 +67,7 @@ def get_main_parser():
         "--samples",
         "--json",
         dest="samplejson",
+        nargs="+",
         default="dummy_samples.json",
         help="JSON file containing dataset and file locations (default: %(default)s)",
     )
@@ -77,10 +84,11 @@ def get_main_parser():
             "Summer23",
             "Summer23BPix",
             "Summer24",
-            "2018_UL",
-            "2017_UL",
-            "2016preVFP_UL",
-            "2016postVFP_UL",
+            "Prompt25",
+            "2018-UL",
+            "2017-UL",
+            "2016preVFP-UL",
+            "2016postVFP-UL",
             "CAMPAIGN_prompt_dataMC",
         ],
         help="Dataset campaign, change the corresponding correction files",
@@ -89,8 +97,17 @@ def get_main_parser():
         "--isSyst",
         default=False,
         type=str,
-        choices=[False, "all", "weight_only", "JERC_split", "JP_MC"],
-        help="Run with systematics, all, weights_only(no JERC uncertainties included),JERC_split, None",
+        choices=[
+            "False",
+            "all",
+            "weight_only",
+            "JEC_full",
+            "JEC_reduced",
+            "JEC_reduced_JER_split",
+            "JEC_total",
+            "JP_MC",
+        ],
+        help="Run with systematics (default: %(default)s)",
     )
     parser.add_argument("--isArray", action="store_true", help="Output root files")
 
@@ -131,6 +148,16 @@ if __name__ == "__main__":
     print("Running with the following options:")
     print(args)
 
+    uid = os.getuid()
+    homedir = os.getenv("HOME")
+    expected_value = f"{homedir}/x509up_u{uid}"
+    current_value = os.getenv("X509_USER_PROXY")
+    if current_value != expected_value:
+        print("X509_USER_PROXY is NOT set correctly.")
+        print(f"Please run the following command in your shell:")
+        print(f"export X509_USER_PROXY=$HOME/x509up_u`id -u`")
+        sys.exit(1)
+
     current_dir = os.path.dirname(os.path.abspath(__file__))
     base_dir = current_dir.replace("/condor", "")
 
@@ -153,10 +180,11 @@ if __name__ == "__main__":
                 raise Exception("Invalid input, exiting")
 
         if not skip_tar:
+            jobdirs = [d for d in os.listdir(base_dir) if d.startswith("jobs_")]
             make_tarfile(
                 "BTVNanoCommissioning.tar.gz",
                 base_dir,
-                exclude_dirs=["jsonpog-integration", "BTVNanoCommissioning.egg-info"],
+                exclude_dirs=["BTVNanoCommissioning.egg-info"] + jobdirs,
             )
 
     # Create job dir
@@ -178,8 +206,15 @@ if __name__ == "__main__":
         json.dump(vars(args), json_file, indent=4)
 
     ## split the sample json
-    with open(args.samplejson) as f:
-        sample_dict = json.load(f)
+    if isinstance(args.samplejson, str):
+        samplejson = [args.samplejson]
+    else:
+        samplejson = args.samplejson
+    sample_dict = {}
+    for js in samplejson:
+        with open(js) as f:
+            sample_dict.update(json.load(f))
+
     split_sample_dict = {}
     counter = 0
     only = []
@@ -224,27 +259,33 @@ request_cpus = 1
 request_memory = 2000
 use_x509userproxy = true
 
-+JobFlavour = "tomorrow"
++JobFlavour = "{jobqueue}"
 
 Log        = {log_dir}/job.log_$(Cluster)
 Output     = {log_dir}/job.out_$(Cluster)-$(Process)
 Error      = {log_dir}/job.err_$(Cluster)-$(Process)
 
+max_retries             = 10
+periodic_release        = True
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT_OR_EVICT
 transfer_input_files    = {transfer_input_files}
+JobBatchName            = {batch_name}
+transfer_output_files   = .success
 
 Queue JOBNUM from {jobnum_file}
 """.format(
         executable=f"{base_dir}/condor/execute.sh",
+        jobqueue=args.jobqueue,
         log_dir=f"{base_dir}/{job_dir}/log",
         transfer_input_files=f"{base_dir}/{job_dir}/arguments.json,{base_dir}/{job_dir}/split_samples.json,{base_dir}/{job_dir}/jobnum_list.txt"
         + ("" if args.remoteRepo else f",{base_dir}/BTVNanoCommissioning.tar.gz"),
+        batch_name=args.jobName,
         jobnum_file=f"{base_dir}/{job_dir}/jobnum_list.txt",
     )
     with open(os.path.join(job_dir, "submit.jdl"), "w") as f:
         f.write(jdl_template)
     os.system(f"condor_submit {job_dir}/submit.jdl")
-    print(
-        f"Setup completed. Now submit the condor jobs by:\n  condor_submit {job_dir}/submit.jdl"
-    )
+    # print(
+    #     f"Setup completed. Now submit the condor jobs by:\n  condor_submit {job_dir}/submit.jdl"
+    # )

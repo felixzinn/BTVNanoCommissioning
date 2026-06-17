@@ -1,5 +1,6 @@
 import awkward as ak
 import numpy as np
+from BTVNanoCommissioning.helpers.func import campaign_map
 
 
 def HLT_helper(events, triggers):
@@ -25,8 +26,9 @@ def jet_id(events, campaign, max_eta=2.5, min_pt=20):
     # Implement fix from:
     # https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID13p6TeV#nanoAOD_Flags
     # Note: this is only the jetId==6, ie. passJetIdTightLepVeto. Looser selection is not implemented.
-    if campaign in ["Summer22", "Summer22EE", "Summer23", "Summer23BPix"]:
-        # NanoV12
+    has_jetId = hasattr(events.Jet, "jetId")
+    if campaign in ["Summer22", "Summer22EE", "Summer23", "Summer23BPix"] and has_jetId:
+        # NanoV12 (has jetId branch)
         jetid = ak.where(
             abs(events.Jet.eta) <= 2.7,
             (events.Jet.jetId >= 2)
@@ -37,13 +39,22 @@ def jet_id(events, campaign, max_eta=2.5, min_pt=20):
                 (events.Jet.jetId >= 2) & (events.Jet.neHEF < 0.99),
                 ak.where(
                     (abs(events.Jet.eta) > 3.0),
-                    (events.Jet.jetId & (1 << 1)) & (events.Jet.neEmEF < 0.4),
+                    (events.Jet.jetId >= 2) & (events.Jet.neEmEF < 0.4),
                     ak.zeros_like(events.Jet.pt, dtype=bool),
                 ),
             ),
         )
-    elif campaign in ["Winter24", "Summer24"]:
-        # NanoV13 & NanoV14 & NanoV15
+    elif campaign in [
+        "Summer22",
+        "Summer22EE",
+        "Summer23",
+        "Summer23BPix",
+        "Winter24",
+        "Summer24",
+        "Winter25",
+        "Prompt25",
+    ]:
+        # NanoV13+ / NanoV15 reprocessing (no jetId branch, compute from components)
         barrel = (
             (events.Jet.neHEF < 0.99)
             & (events.Jet.neEmEF < 0.9)
@@ -77,10 +88,84 @@ def jet_id(events, campaign, max_eta=2.5, min_pt=20):
             jetid & (events.Jet.muEF < 0.8) & (events.Jet.chEmEF < 0.8),
             jetid,
         )
+    elif campaign in ["2016preVFP-UL", "2016postVFP-UL"]:
+        # Run 2 NanoAODv15 jet ID for 2016 (TightLepVeto)
+        # https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID13TeV
+        barrel_2016 = (
+            (events.Jet.neHEF < 0.9)
+            & (events.Jet.neEmEF < 0.9)
+            & (events.Jet.chMultiplicity + events.Jet.neMultiplicity > 1)
+            & (events.Jet.chHEF > 0.0)
+            & (events.Jet.chMultiplicity > 0)
+        )
+        t1_2016 = (events.Jet.neHEF < 0.98) & (events.Jet.neEmEF < 0.99)
+        t2_2016 = events.Jet.neMultiplicity >= 1
+        endcap_2016 = (events.Jet.neMultiplicity > 2) & (events.Jet.neEmEF < 0.9)
+
+        jetid = ak.where(
+            abs(events.Jet.eta) <= 2.4,
+            barrel_2016,
+            ak.where(
+                (abs(events.Jet.eta) > 2.4) & (abs(events.Jet.eta) <= 2.7),
+                t1_2016,
+                ak.where(
+                    (abs(events.Jet.eta) > 2.7) & (abs(events.Jet.eta) <= 3.0),
+                    t2_2016,
+                    ak.where(
+                        (abs(events.Jet.eta) > 3.0),
+                        endcap_2016,
+                        ak.zeros_like(events.Jet.pt, dtype=bool),
+                    ),
+                ),
+            ),
+        )
+        # TightLepVeto: only in barrel (|eta| <= 2.4) for 2016
+        jetid = ak.where(
+            np.abs(events.Jet.eta) <= 2.4,
+            jetid & (events.Jet.muEF < 0.8) & (events.Jet.chEmEF < 0.8),
+            jetid,
+        )
+    elif campaign in ["2017-UL", "2018-UL"]:
+        # Run 2 NanoAODv15 jet ID for 2017 & 2018 (TightLepVeto)
+        # https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID13TeV
+        barrel_1718 = (
+            (events.Jet.neHEF < 0.9)
+            & (events.Jet.neEmEF < 0.9)
+            & (events.Jet.chMultiplicity + events.Jet.neMultiplicity > 1)
+            & (events.Jet.chHEF > 0.0)
+            & (events.Jet.chMultiplicity > 0)
+        )
+        t1_1718 = (events.Jet.neHEF < 0.90) & (events.Jet.neEmEF < 0.99)
+        t2_1718 = events.Jet.neHEF < 0.9999
+        endcap_1718 = (events.Jet.neMultiplicity > 2) & (events.Jet.neEmEF < 0.9)
+
+        jetid = ak.where(
+            abs(events.Jet.eta) <= 2.6,
+            barrel_1718,
+            ak.where(
+                (abs(events.Jet.eta) > 2.6) & (abs(events.Jet.eta) <= 2.7),
+                t1_1718,
+                ak.where(
+                    (abs(events.Jet.eta) > 2.7) & (abs(events.Jet.eta) <= 3.0),
+                    t2_1718,
+                    ak.where(
+                        (abs(events.Jet.eta) > 3.0),
+                        endcap_1718,
+                        ak.zeros_like(events.Jet.pt, dtype=bool),
+                    ),
+                ),
+            ),
+        )
+        # TightLepVeto: |eta| <= 2.7 for 2017 & 2018
+        jetid = ak.where(
+            np.abs(events.Jet.eta) <= 2.7,
+            jetid & (events.Jet.muEF < 0.8) & (events.Jet.chEmEF < 0.8),
+            jetid,
+        )
     else:
         jetid = events.Jet.jetId >= 5
 
-    jetid = ak.values_astype(jetid, np.bool)
+    jetid = ak.values_astype(jetid, bool)
 
     if campaign == "Rereco17_94X":
         # Use puId for Run2
@@ -92,6 +177,7 @@ def jet_id(events, campaign, max_eta=2.5, min_pt=20):
         )
     else:
         jetmask = (events.Jet.pt > min_pt) & (abs(events.Jet.eta) <= max_eta) & (jetid)
+
     return jetmask
 
 
@@ -99,7 +185,7 @@ def jet_id(events, campaign, max_eta=2.5, min_pt=20):
 def ele_cuttightid(events, campaign):
     ele_etaSC = (
         events.Electron.eta + events.Electron.deltaEtaSC
-        if "Summer24" not in campaign
+        if campaign not in ["Summer24", "Winter25", "Prompt25"]
         else events.Electron.superclusterEta
     )
     elemask = (
@@ -111,12 +197,29 @@ def ele_cuttightid(events, campaign):
 def ele_mvatightid(events, campaign):
     ele_etaSC = (
         events.Electron.eta + events.Electron.deltaEtaSC
-        if "Summer24" not in campaign
+        if campaign not in ["Summer24", "Winter25", "Prompt25"]
         else events.Electron.superclusterEta
     )
     elemask = (
         (abs(ele_etaSC) < 1.4442) | ((abs(ele_etaSC) > 1.566) & (abs(ele_etaSC) < 2.5))
     ) & (events.Electron.mvaIso_WP80 > 0.5)
+    return elemask
+
+
+def ele_promptmvaid(events, campaign):
+    # https://indico.cern.ch/event/1575017/contributions/6635248/attachments/3115862/5524310/EGammaAug08.pdf
+    ele_etaSC = (
+        events.Electron.eta + events.Electron.deltaEtaSC
+        if campaign not in ["Summer24", "Winter25", "Prompt25"]
+        else events.Electron.superclusterEta
+    )
+    elemask = (
+        (abs(ele_etaSC) < 1.4442) | ((abs(ele_etaSC) > 1.566) & (abs(ele_etaSC) < 2.5))
+    ) & (
+        events.Electron.promptMVA >= 0.9
+        if "Summer24" in campaign or "Prompt25" in campaign
+        else 0.3
+    )
     return elemask
 
 
@@ -141,6 +244,19 @@ def mu_idiso(events, campaign):
     return mumask
 
 
+def mu_promptmvaid(events, campaign):
+    # https://muon-wiki.docs.cern.ch/guidelines/recommendations/#prompt-mva-formerly-tth-mva
+    # https://muon-wiki.docs.cern.ch/guidelines/recommendations/#muon-isolation
+    # https://cms-talk.web.cern.ch/t/prompt-mva-sfs-definition/132578
+    # https://indico.cern.ch/event/1351304/contributions/5688794/attachments/2765665/4817340/CarlosVico_Muon_mvaTTH_24nov2023.pdf (slide 5 for WP)
+    mumask = (
+        (abs(events.Muon.eta) < 2.4)
+        & (events.Muon.tightId > 0.5)
+        & (events.Muon.promptMVA > 0.64)
+    )
+    return mumask
+
+
 def btag_mu_idiso(events, campaign):
     mumask = (
         (abs(events.Muon.eta) < 2.4)
@@ -156,7 +272,7 @@ def jet_cut(events, campaign, ptmin=180, ptmax=1e5, absetamin=0, absetamax=2.5):
         & (abs(events.Jet.eta) < absetamax)
         & (events.Jet.pt > ptmin)
         & (events.Jet.pt < ptmax)
-        & (events.Jet.jetId >= 5)
+        & (jet_id(events, campaign))
     )
     return multijetmask
 
@@ -164,7 +280,8 @@ def jet_cut(events, campaign, ptmin=180, ptmax=1e5, absetamin=0, absetamax=2.5):
 def MET_filters(events, campaign):
     # apply MET filter
     metfilter = ak.ones_like(events.run, dtype=bool)
-    for flag in met_filters[campaign]["data" if "Run" else "mc"]:
+    isRealData = not hasattr(events, "genWeight")
+    for flag in met_filters[campaign]["data" if isRealData else "mc"]:
         metfilter = events.Flag[flag] & metfilter
     ## Flag_ecalBadCalibFilter
     badjet = (
@@ -198,6 +315,82 @@ def btag_wp(jets, year, campaign, tagger, borc, wp):
 
 
 btag_wp_dict = {
+    "2016_2016preVFP-UL": {
+        "UParTAK4": {
+            "b": {
+                "No": 0.0,
+                "L": 0.0387,
+                "M": 0.1847,
+                "T": 0.5467,
+                "XT": 0.6777,
+                "XXT": 0.9219,
+            },
+            "c": {  # placeholder
+                "No": [0.0, 0.0],
+                "L": [0.1, 0.1],  # CvL, then CvB
+                "M": [0.5, 0.5],
+                "T": [0.8, 0.8],
+                "XT": [0.9, 0.9],
+            },
+        },
+    },
+    "2016_2016postVFP-UL": {
+        "UParTAK4": {
+            "b": {
+                "No": 0.0,
+                "L": 0.0400,
+                "M": 0.1898,
+                "T": 0.5538,
+                "XT": 0.6872,
+                "XXT": 0.9353,
+            },
+            "c": {  # placeholder
+                "No": [0.0, 0.0],
+                "L": [0.1, 0.1],  # CvL, then CvB
+                "M": [0.5, 0.5],
+                "T": [0.8, 0.8],
+                "XT": [0.9, 0.9],
+            },
+        },
+    },
+    "2017_2017-UL": {
+        "UParTAK4": {
+            "b": {
+                "No": 0.0,
+                "L": 0.0331,
+                "M": 0.1776,
+                "T": 0.5755,
+                "XT": 0.7274,
+                "XXT": 0.9666,
+            },
+            "c": {  # placeholder
+                "No": [0.0, 0.0],
+                "L": [0.1, 0.1],  # CvL, then CvB
+                "M": [0.5, 0.5],
+                "T": [0.8, 0.8],
+                "XT": [0.9, 0.9],
+            },
+        },
+    },
+    "2018_2018-UL": {  # correct, the format is year_campaign
+        "UParTAK4": {
+            "b": {
+                "No": 0.0,
+                "L": 0.0308,
+                "M": 0.1610,
+                "T": 0.5405,
+                "XT": 0.6992,
+                "XXT": 0.9655,
+            },
+            "c": {  # placeholder
+                "No": [0.0, 0.0],
+                "L": [0.1, 0.1],  # CvL, then CvB
+                "M": [0.5, 0.5],
+                "T": [0.8, 0.8],
+                "XT": [0.9, 0.9],
+            },
+        },
+    },
     "2022_Summer22": {
         "DeepFlav": {
             "b": {
@@ -423,6 +616,25 @@ btag_wp_dict = {
             },
         },
     },
+    "2025_Prompt25": {
+        "UParTAK4": {
+            "b": {
+                "No": 0.0,
+                "L": 0.0246,
+                "M": 0.1272,
+                "T": 0.4648,
+                "XT": 0.6298,
+                "XXT": 0.9739,
+            },
+            "c": {
+                "No": [0.0, 0.0],
+                "L": [0.086, 0.233],  # CvL, then CvB
+                "M": [0.291, 0.457],
+                "T": [0.650, 0.421],
+                "XT": [0.810, 0.736],
+            },
+        },
+    },
 }
 
 
@@ -448,13 +660,13 @@ def wp_dict(year, campaign):
 
     wps_dict = {}
     if os.path.exists(
-        f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/{year}_{campaign}"
+        f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{campaign_map()[campaign]}/latest/"
     ):
         btag = correctionlib.CorrectionSet.from_file(
-            f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/{year}_{campaign}/btagging.json.gz"
+            f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{campaign_map()[campaign]}/latest/btagging.json.gz"
         )
         ctag = correctionlib.CorrectionSet.from_file(
-            f"/cvmfs/cms.cern.ch/rsync/cms-nanoAOD/jsonpog-integration/POG/BTV/{year}_{campaign}/ctagging.json.gz"
+            f"/cvmfs/cms-griddata.cern.ch/cat/metadata/BTV/{campaign_map()[campaign]}/latest/ctagging.json.gz"
         )
         tagger_list = [i for i in list(btag.keys()) if "wp_values" in i]
 
@@ -484,27 +696,7 @@ def wp_dict(year, campaign):
 
 
 met_filters = {
-    "2016preVFP_UL": {
-        "data": [
-            "goodVertices",
-            "globalSuperTightHalo2016Filter",
-            "HBHENoiseFilter",
-            "HBHENoiseIsoFilter",
-            "EcalDeadCellTriggerPrimitiveFilter",
-            "BadPFMuonFilter",
-            "eeBadScFilter",
-        ],
-        "mc": [
-            "goodVertices",
-            "globalSuperTightHalo2016Filter",
-            "HBHENoiseFilter",
-            "HBHENoiseIsoFilter",
-            "EcalDeadCellTriggerPrimitiveFilter",
-            "BadPFMuonFilter",
-            "eeBadScFilter",
-        ],
-    },
-    "2016postVFP_UL": {
+    "2016preVFP-UL": {
         "data": [
             "goodVertices",
             "globalSuperTightHalo2016Filter",
@@ -526,7 +718,29 @@ met_filters = {
             "eeBadScFilter",
         ],
     },
-    "2017_UL": {
+    "2016postVFP-UL": {
+        "data": [
+            "goodVertices",
+            "globalSuperTightHalo2016Filter",
+            "HBHENoiseFilter",
+            "HBHENoiseIsoFilter",
+            "EcalDeadCellTriggerPrimitiveFilter",
+            "BadPFMuonFilter",
+            "BadPFMuonDzFilter",
+            "eeBadScFilter",
+        ],
+        "mc": [
+            "goodVertices",
+            "globalSuperTightHalo2016Filter",
+            "HBHENoiseFilter",
+            "HBHENoiseIsoFilter",
+            "EcalDeadCellTriggerPrimitiveFilter",
+            "BadPFMuonFilter",
+            "BadPFMuonDzFilter",
+            "eeBadScFilter",
+        ],
+    },
+    "2017-UL": {
         "data": [
             "goodVertices",
             "globalSuperTightHalo2016Filter",
@@ -552,7 +766,7 @@ met_filters = {
             "ecalBadCalibFilter",
         ],
     },
-    "2018_UL": {
+    "2018-UL": {
         "data": [
             "goodVertices",
             "globalSuperTightHalo2016Filter",
@@ -667,6 +881,7 @@ met_filters = {
             "BadPFMuonDzFilter",
             "hfNoisyHitsFilter",
             "eeBadScFilter",
+            "ecalBadCalibFilter",
         ],
         "mc": [
             "goodVertices",
@@ -676,6 +891,29 @@ met_filters = {
             "BadPFMuonDzFilter",
             "hfNoisyHitsFilter",
             "eeBadScFilter",
+            "ecalBadCalibFilter",
+        ],
+    },
+    "Prompt25": {
+        "data": [
+            "goodVertices",
+            "globalSuperTightHalo2016Filter",
+            "EcalDeadCellTriggerPrimitiveFilter",
+            "BadPFMuonFilter",
+            "BadPFMuonDzFilter",
+            "hfNoisyHitsFilter",
+            "eeBadScFilter",
+            "ecalBadCalibFilter",
+        ],
+        "mc": [
+            "goodVertices",
+            "globalSuperTightHalo2016Filter",
+            "EcalDeadCellTriggerPrimitiveFilter",
+            "BadPFMuonFilter",
+            "BadPFMuonDzFilter",
+            "hfNoisyHitsFilter",
+            "eeBadScFilter",
+            "ecalBadCalibFilter",
         ],
     },
     "prompt_dataMC": {

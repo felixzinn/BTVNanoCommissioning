@@ -1,8 +1,5 @@
-import collections, awkward as ak, numpy as np
-import os
-import uproot
+import awkward as ak, numpy as np
 from coffea import processor
-from coffea.analysis_tools import Weights
 
 # functions to load SFs, corrections
 from BTVNanoCommissioning.utils.correction import (
@@ -10,24 +7,26 @@ from BTVNanoCommissioning.utils.correction import (
     load_SF,
     weight_manager,
     common_shifts,
+    reweighting,
 )
 
 # user helper function
-from BTVNanoCommissioning.helpers.func import flatten, update, dump_lumi, PFCand_link
+from BTVNanoCommissioning.helpers.func import update, dump_lumi, PFCand_link
 from BTVNanoCommissioning.helpers.update_branch import missing_branch
 
 ## load histograms & selctions for this workflow
 from BTVNanoCommissioning.utils.histogramming.histogrammer import (
     histogrammer,
-    histo_writter,
+    histo_writer,
 )
 from BTVNanoCommissioning.utils.array_writer import array_writer
 from BTVNanoCommissioning.utils.selection import (
     HLT_helper,
     jet_id,
+    mu_promptmvaid,
+    ele_promptmvaid,
     mu_idiso,
     ele_cuttightid,
-    btag_wp,
 )
 
 
@@ -41,6 +40,7 @@ class NanoProcessor(processor.ProcessorABC):
         isArray=False,
         noHist=False,
         chunksize=75000,
+        selectionModifier="tt_dilep",
     ):
         self._year = year
         self._campaign = campaign
@@ -50,8 +50,9 @@ class NanoProcessor(processor.ProcessorABC):
         self.noHist = noHist
         self.lumiMask = load_lumi(self._campaign)
         self.chunksize = chunksize
+        self.selMod = selectionModifier
         ## Load corrections
-        self.SF_map = load_SF(self._year, self._campaign)
+        self.SF_map = load_SF(self._year, self._campaign, self.selMod)
 
     @property
     def accumulator(self):
@@ -60,14 +61,15 @@ class NanoProcessor(processor.ProcessorABC):
     ## Apply corrections on momentum/mass on MET, Jet, Muon
     def process(self, events):
         events = missing_branch(events)
+        sumws = reweighting(events, self.isSyst)
         vetoed_events, shifts = common_shifts(self, events)
 
         return processor.accumulate(
-            self.process_shift(update(vetoed_events, collections), name)
+            self.process_shift(update(vetoed_events, collections), sumws, name)
             for collections, name in shifts
         )
 
-    def process_shift(self, events, shift_name):
+    def process_shift(self, events, sumws, shift_name):
         dataset = events.metadata["dataset"]
         isRealData = not hasattr(events, "genWeight")
         ## Create histograms
@@ -80,10 +82,27 @@ class NanoProcessor(processor.ProcessorABC):
             )
 
         if shift_name is None:
-            if isRealData:
-                output["sumw"] = len(events)
-            else:
-                output["sumw"] = ak.sum(events.genWeight)
+            output["sumw"] = sumws["sumw"]
+            if not isRealData and self.isSyst:
+                if "LHEPdfWeight" in events.fields:
+                    output["PDF_sumwUp"] = sumws["PDF_sumwUp"]
+                    output["PDF_sumwDown"] = sumws["PDF_sumwDown"]
+                    output["aS_sumwUp"] = sumws["aS_sumwUp"]
+                    output["aS_sumwDown"] = sumws["aS_sumwDown"]
+                    output["PDFaS_sumwUp"] = sumws["PDFaS_sumwUp"]
+                    output["PDFaS_sumwDown"] = sumws["PDFaS_sumwDown"]
+                if "LHEScaleWeight" in events.fields:
+                    output["muR_sumwUp"] = sumws["muR_sumwUp"]
+                    output["muR_sumwDown"] = sumws["muR_sumwDown"]
+                    output["muF_sumwUp"] = sumws["muF_sumwUp"]
+                    output["muF_sumwDown"] = sumws["muF_sumwDown"]
+                if "PSWeight" in events.fields:
+                    if len(events.PSWeight[0]) == 4:
+                        output["ISR_sumwUp"] = sumws["ISR_sumwUp"]
+                        output["ISR_sumwDown"] = sumws["ISR_sumwDown"]
+                        output["FSR_sumwUp"] = sumws["FSR_sumwUp"]
+                        output["FSR_sumwDown"] = sumws["FSR_sumwDown"]
+
         ####################
         #    Selections    #
         ####################
@@ -105,17 +124,28 @@ class NanoProcessor(processor.ProcessorABC):
 
         ## Muon cuts
         # muon twiki: https://twiki.cern.ch/twiki/bin/view/CMS/SWGuideMuonIdRun2
-        events.Muon = events.Muon[
-            (events.Muon.pt > 30) & mu_idiso(events, self._campaign)
-        ]
+        if self._campaign in ["Summer24", "Winter25", "Prompt25"]:  # NanoAODv15
+            events.Muon = events.Muon[
+                (events.Muon.pt > 25) & mu_promptmvaid(events, self._campaign)
+            ]
+        else:
+            events.Muon = events.Muon[
+                (events.Muon.pt > 25) & mu_idiso(events, self._campaign)
+            ]
         events.Muon = ak.pad_none(events.Muon, 1, axis=1)
         req_muon = ak.count(events.Muon.pt, axis=1) == 1
 
         ## Electron cuts
         # electron twiki: https://twiki.cern.ch/twiki/bin/viewauth/CMS/CutBasedElectronIdentificationRun2
-        events.Electron = events.Electron[
-            (events.Electron.pt > 30) & ele_cuttightid(events, self._campaign)
-        ]
+        if self._campaign in ["Summer24", "Winter25", "Prompt25"]:  # NanoAODv15
+            events.Electron = events.Electron[
+                (events.Electron.pt > 25) & ele_promptmvaid(events, self._campaign)
+            ]
+        else:
+            events.Electron = events.Electron[
+                (events.Electron.pt > 25) & ele_cuttightid(events, self._campaign)
+            ]
+
         events.Electron = ak.pad_none(events.Electron, 1, axis=1)
         req_ele = ak.count(events.Electron.pt, axis=1) == 1
 
@@ -199,7 +229,7 @@ class NanoProcessor(processor.ProcessorABC):
 
         # Configure histograms
         if not self.noHist:
-            output = histo_writter(
+            output = histo_writer(
                 pruned_ev, output, weights, systematics, self.isSyst, self.SF_map
             )
         # Output arrays

@@ -133,6 +133,12 @@ parser.add_argument(
     default=4,
     help="Number of workers to use for futures executor",
 )
+parser.add_argument(
+    "--doOnly",
+    type=str,
+    default=None,
+    help="Do only Data or MC",
+)
 
 args = parser.parse_args()
 
@@ -221,7 +227,7 @@ def get_xrootd_sites_map():
                                     )
                         else:
                             sites_xrootd_access[site["rse"]] = proc["prefix"]
-        json.dump(sites_xrootd_access, open(".sites_map.json", "w"))
+        json.dump(sites_xrootd_access, open(".sites_map.json", "w"), indent=4)
 
     return json.load(open(".sites_map.json"))
 
@@ -233,6 +239,7 @@ if args.DAS_campaign == "auto":
         "Summer23_2023": "Run2023C*Sep2023,Run3Summer23NanoAODv12",
         "Summer23BPix_2023": "Run2023D*Sep2023,Run3Summer23BPixNanoAODv12",
         "Summer24_2024": "Run2024*MINIv6,RunIII2024Summer24NanoAODv15",
+        "Summer25_2025": "Run2024*MINIv6,RunIII2024Summer24NanoAODv15",  # not a mistake, one uses 2024 MC for 2025 analysis
     }
     key = f"{args.campaign}_{args.year}"
     if key in DAS_campaign_map:
@@ -241,7 +248,7 @@ if args.DAS_campaign == "auto":
             f"Automatically selected DAS_campaign {args.DAS_campaign} based on {key}."
         )
     else:
-        raise (
+        raise ValueError(
             f"Cannot automatically assign DAS_campaign based on {key}. Valid keys:",
             list(DAS_campaign_map.keys()),
         )
@@ -655,8 +662,7 @@ def run_python_xrootd_ping(server, site, timeout=10):
             python_path = python_file.name
 
             # Write a self-contained Python script
-            python_file.write(
-                """
+            python_file.write("""
 import sys
 import os
 import time
@@ -700,8 +706,7 @@ try:
 except Exception as e:
     print(f"ERROR: {str(e)}")
     sys.exit(2)
-"""
-            )
+""")
 
         # Create the bash wrapper script that sets up the environment
         with tempfile.NamedTemporaryFile(
@@ -1870,6 +1875,9 @@ def main(args):
 
     if args.from_workflow:
         for sample in predefined_sample[args.from_workflow].keys():
+            if args.doOnly is not None:
+                if sample != args.doOnly:
+                    continue
             if (
                 os.path.exists(
                     f"metadata/{args.campaign}/{sample}_{args.campaign}_{args.year}_{args.from_workflow}.json"
@@ -1882,7 +1890,7 @@ def main(args):
     elif os.path.exists(args.output) and args.overwrite == False:
         raise Exception(f"{args.output} exists")
 
-    ## If you only provide dataset from the dataset name(DAS) or do from_workflow
+    ## If you only provide dataset from the dataset name (DAS) or do from_workflow
     if args.from_dataset or args.from_workflow is not None:
         if args.from_dataset:
             f = open(args.input)
@@ -1890,6 +1898,9 @@ def main(args):
         else:
             lines = []
             for sample in predefined_sample[args.from_workflow].keys():
+                if args.doOnly is not None:
+                    if sample != args.doOnly:
+                        continue
                 lines += predefined_sample[args.from_workflow][sample]
             args.input = args.from_workflow + "_predef"
             campaign_list = args.DAS_campaign.split(",")
@@ -1920,9 +1931,14 @@ def main(args):
                         print(f"  {i+1}: {d}")
                     campaigns = [d.split("/")[2] for d in dataset]
                     campaign_input = input(
-                        f"{l} is which campaign? [Enter integer corresponding to above list. Use ',' for multiple]: "
+                        f"{l} is which campaign? [Enter integer corresponding to above list. Use ',' for multiple or 'all']: "
                     )
                     camp_idxs = []
+
+                    if campaign_input.strip() == "all":
+                        camp_idxs = list(range(len(campaigns)))
+                        break
+                    cont = False
                     for camp_idx in campaign_input.split(","):
                         try:
                             idx = int(camp_idx) - 1
@@ -1930,7 +1946,9 @@ def main(args):
                             camp_idxs.append(idx)
                         except:
                             print(f"{camp_idx} is not a valid input. Try again!\n")
-                            continue
+                            cont = True
+                    if cont:
+                        continue
                     break
 
                 dataset = []
@@ -2071,12 +2089,19 @@ def main(args):
     if args.from_workflow:
         os.system(f"mkdir -p metadata/{args.campaign}/")
         for sample in predefined_sample[args.from_workflow].keys():
+            if args.doOnly is not None:
+                if sample != args.doOnly:
+                    continue
             reduced_fdict = {}
             for dataset in fdict.keys():
                 for s in predefined_sample[args.from_workflow][sample]:
-
-                    if s in dataset:
-                        reduced_fdict[dataset] = fdict[dataset]
+                    if "*" in s:
+                        parts = s.split("*")
+                        if all([p in dataset for p in parts]):
+                            reduced_fdict[dataset] = fdict[dataset]
+                    else:
+                        if s in dataset:
+                            reduced_fdict[dataset] = fdict[dataset]
 
             with open(
                 f"metadata/{args.campaign}/{sample}_{args.campaign}_{args.year}_{args.from_workflow}.json",
