@@ -69,7 +69,9 @@ pip install -e .
 pip install psutil
 
 # Build the sample json given the job id
-python -c "import json; json.dump(json.load(open('$WORKDIR/split_samples.json'))['$JOBID'], open('sample.json', 'w'), indent=4)"
+python -c "import json, os; flname = 'split_samples.json' if os.path.isfile(f'$WORKDIR/split_samples.json') else 'split_samples_resubmit.json';  json.dump(json.load(open(f'$WORKDIR/{flname}'))['$JOBID'], open('$WORKDIR/sample.json', 'w'), indent=4)"
+
+ls -lah $WORKDIR
 
 # Unparse arguments and send to runner.py
 OPTS="--wf ${ARGS[workflow]} --year ${ARGS[year]} --campaign ${ARGS[campaign]} --chunk ${ARGS[chunk]}"

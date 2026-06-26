@@ -693,12 +693,14 @@ if __name__ == "__main__":
                         raise Exception("Invalid input, exiting")
 
                 if not skip_tar:
+                    jobdirs = [d for d in os.listdir(base_dir) if d.startswith("jobs_")]
                     make_tarfile(
                         "BTVNanoCommissioning.tar.gz",
                         base_dir,
                         exclude_dirs=[
                             "BTVNanoCommissioning.egg-info",
-                        ],
+                        ]
+                        + jobdirs,
                     )
             import shutil
 
