@@ -5,6 +5,7 @@ import mplhep as hep
 import numpy as np
 import glob, json, argparse, math, copy, os, warnings
 import gc
+import hist as hist_lib
 
 from BTVNanoCommissioning.utils.plot_utils import (
     sample_mergemap,
@@ -192,6 +193,14 @@ exp_systs = {
     "MuonScale": "Muon Scale",
     "MuonResol": "Muon Resol.",
 }
+btag_sf_systs = {
+    "btagUParTAK4B_hf": "hf",
+    "btagUParTAK4B_lf": "lf",
+    "btagUParTAK4B_hfstats1": "hfstats1",
+    "btagUParTAK4B_hfstats2": "hfstats2",
+    "btagUParTAK4B_lfstats1": "lfstats1",
+    "btagUParTAK4B_lfstats2": "lfstats2",
+}
 th_systs = {
     "ttbar_weight": r"Top $p_T$",
     "PDF_weight": "PDF",
@@ -375,11 +384,11 @@ def plot_systs(
 
     # Create figure
     fig, axs = plt.subplots(
-        5,  # Y
+        6,  # Y
         1,  # X
-        figsize=(10, 16),
+        figsize=(10, 18),
         sharex=True,
-        gridspec_kw={"height_ratios": [3, 1, 1, 1, 1]},
+        gridspec_kw={"height_ratios": [3, 1, 1, 1, 1, 1]},
     )
     fig.subplots_adjust(hspace=0.1)  # Adjust vertical space between Axes
 
@@ -432,30 +441,8 @@ def plot_systs(
         )
 
     # Add black line to ratio plots
-    axs[1].plot(
-        [h_mc_nom.axes[0].edges[0], h_mc_nom.axes[0].edges[-1]],
-        [1.0, 1.0],
-        linestyle=":",
-        color="black",
-    )
-    axs[2].plot(
-        [h_mc_nom.axes[0].edges[0], h_mc_nom.axes[0].edges[-1]],
-        [1.0, 1.0],
-        linestyle=":",
-        color="black",
-    )
-    axs[3].plot(
-        [h_mc_nom.axes[0].edges[0], h_mc_nom.axes[0].edges[-1]],
-        [1.0, 1.0],
-        linestyle=":",
-        color="black",
-    )
-    axs[4].plot(
-        [h_mc_nom.axes[0].edges[0], h_mc_nom.axes[0].edges[-1]],
-        [1.0, 1.0],
-        linestyle=":",
-        color="black",
-    )
+    for ax in axs[1:]:
+        ax.axhline(y=1.0, color="black", linestyle=":")
 
     total_up = np.zeros_like(h_mc_nom.values())
     total_down = np.zeros_like(h_mc_nom.values())
@@ -562,7 +549,53 @@ def plot_systs(
     exp_up = hide_inf_nan(1.0 + exp_total_up / h_mc_nom.values(), "up")
     exp_down = hide_inf_nan(1.0 - exp_total_down / h_mc_nom.values(), "down")
     plot_band(axs[1], exp_up, exp_down, h_mc_nom.axes[0].edges, "Exp. Total")
-    plot_uncertainty(axs[4], h_mc_nom, exp_up, exp_down, "Experimental", colors6[0])
+    plot_uncertainty(axs[-1], h_mc_nom, exp_up, exp_down, "Experimental", colors6[0])
+
+    #############################
+    # btagging SF uncertainties #
+    #############################
+
+    btag_total_up = np.zeros_like(h_mc_nom.values())
+    btag_total_down = np.zeros_like(h_mc_nom.values())
+
+    colors_it = iter(colors6)
+    for syst, name in btag_sf_systs.items():
+        if (
+            f"{syst}Up" not in h_mc.axes["syst"]
+            or f"{syst}Down" not in h_mc.axes["syst"]
+        ):
+            print(f"WARNING: {syst}Up or {syst}Down are not available!")
+            print(f'         Available systematics are: {h_mc.axes["syst"]}')
+            continue
+
+        axis_up = copy.deepcopy(axis)
+        axis_up["syst"] = f"{syst}Up"
+        axis_down = copy.deepcopy(axis)
+        axis_down["syst"] = f"{syst}Down"
+
+        h_up = h_mc[axis_up]
+        h_down = h_mc[axis_down]
+
+        rat_up = hide_inf_nan(h_up.values() / h_mc_nom.values(), "up")
+        rat_down = hide_inf_nan(h_down.values() / h_mc_nom.values(), "down")
+        plot_uncertainty(
+            axs[4], h_mc_nom, rat_up, rat_down, name, next(colors_it)
+        )
+
+        syst_up, syst_down = get_error_magnitude(
+            h_mc_nom.values(), h_up.values(), h_down.values()
+        )
+        btag_total_up += syst_up * syst_up
+        btag_total_down += syst_down * syst_down
+
+    total_up += btag_total_up
+    total_down += btag_total_down
+    btag_total_up = np.sqrt(btag_total_up)
+    btag_total_down = np.sqrt(btag_total_down)
+    btag_total_up = hide_inf_nan(1.0 + btag_total_up / h_mc_nom.values(), "up")
+    btag_total_down = hide_inf_nan(1.0 - btag_total_down / h_mc_nom.values(), "down")
+    plot_band(axs[4], btag_total_up, btag_total_down, h_mc_nom.axes[0].edges, "btag SF Total")
+    plot_uncertainty(axs[-1], h_mc_nom, btag_total_up, btag_total_down, "btag SF", colors6[3])
 
     #############################
     # Theoretical uncertainties #
@@ -629,7 +662,7 @@ def plot_systs(
     th_up = hide_inf_nan(1.0 + th_total_up / h_mc_nom.values(), "up")
     th_down = hide_inf_nan(1.0 - th_total_down / h_mc_nom.values(), "down")
     plot_band(axs[3], th_up, th_down, h_mc_nom.axes[0].edges, "Th. Total")
-    plot_uncertainty(axs[4], h_mc_nom, th_up, th_down, "Theoretical", colors6[2])
+    plot_uncertainty(axs[-1], h_mc_nom, th_up, th_down, "Theoretical", colors6[2])
 
     ###########################
     # Statistical uncertainty #
@@ -642,7 +675,7 @@ def plot_systs(
     stat_total = np.sqrt(stat_total)
     stat_up = hide_inf_nan(1.0 + stat_total / h_mc_nom.values(), "up")
     stat_down = hide_inf_nan(1.0 - stat_total / h_mc_nom.values(), "down")
-    plot_uncertainty(axs[4], h_mc_nom, stat_up, stat_down, "MC Stat.", colors6[5])
+    plot_uncertainty(axs[-1], h_mc_nom, stat_up, stat_down, "MC Stat.", colors6[5])
 
     ########################
     # All MC uncertainties #
@@ -652,7 +685,7 @@ def plot_systs(
     total_down = np.sqrt(total_down)
     total_up_ratio = hide_inf_nan(1.0 + total_up / h_mc_nom.values(), "up")
     total_down_ratio = hide_inf_nan(1.0 - total_down / h_mc_nom.values(), "down")
-    plot_band(axs[4], total_up_ratio, total_down_ratio, h_mc_nom.axes[0].edges, "Total")
+    plot_band(axs[-1], total_up_ratio, total_down_ratio, h_mc_nom.axes[0].edges, "Total")
 
     # Add total MC uncertainty bars to MC histogram
     MCerrorband(
@@ -670,7 +703,7 @@ def plot_systs(
         plotratio(
             h_data,
             h_mc_nom * scale,
-            ax=axs[4],
+            ax=axs[-1],
             flow=None,
             xerr=False,
             ext_denom_error=np.array([syst_up, syst_down]),
@@ -684,11 +717,8 @@ def plot_systs(
     #######################
 
     # Set legend font sizes and columns
-    axs[0].legend(fontsize=15, ncols=3)
-    axs[1].legend(fontsize=12, ncols=3)
-    axs[2].legend(fontsize=12, ncols=3)
-    axs[3].legend(fontsize=12, ncols=3)
-    axs[4].legend(fontsize=12, ncols=3)
+    for ax in axs:
+        ax.legend(fontsize=12, ncols=4)
 
     # Add additional plot info
     input_txt = ""
@@ -757,7 +787,7 @@ def plot_systs(
     )
 
     # Set x and y axis limits
-    axs[4].set_xlim(
+    axs[-1].set_xlim(
         (
             h_mc_nom.axes[0].edges[0]
             if bin_min is None
@@ -769,27 +799,28 @@ def plot_systs(
             else h_mc_nom.axes[0].edges[bin_max]
         ),
     )
-    axs[1].set_ylim(0.9, 1.1)
-    axs[2].set_ylim(0.9, 1.1)
-    axs[3].set_ylim(0.9, 1.1)
+    for ax in axs[1:-2]:
+        ax.set_ylim(0.9, 1.1)
     axs[4].set_ylim(0.5, 1.5)
+    axs[-1].set_ylim(0.5, 1.5)
 
     # Set labels
     hep.cms.label("Private Work", data=True, lumi=lumi / 1000.0, com=13.6, ax=axs[0])
     if "2Dbin" in variable:
-        axs[4].set_xticks(
+        axs[-1].set_xticks(
             [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5],
             ["L0", "C0", "C1", "C2", "C3", "C4", "B0", "B1", "B2", "B3", "B4"],
         )
     if variable == "npv":
-        axs[4].locator_params(axis="x", nbins=10)
+        axs[-1].locator_params(axis="x", nbins=10)
     axs[0].set_xlabel("")
-    axs[4].set_xlabel(axes_name(variable))
+    axs[-1].set_xlabel(axes_name(variable))
     axs[0].set_ylabel("Events")
     axs[1].set_ylabel("Exp. Unc.")
     axs[2].set_ylabel("JES Unc.")
     axs[3].set_ylabel("Th. Unc.")
-    axs[4].set_ylabel("Total Unc.")
+    axs[4].set_ylabel("btag SF")
+    axs[-1].set_ylabel("Total Unc.")
 
     outname = f"{outdir}/systs_{var}_"
     if split == "flavour":
@@ -864,7 +895,17 @@ if __name__ == "__main__":
     }
     print("Samples:", collated.keys())
 
-    vars = args.vars.strip().split(",")
+    available_vars = [
+        k
+        for k in collated["mc"]
+        if "Up" not in k
+        and "Down" not in k
+        and isinstance(collated["mc"][k], hist_lib.hist.Hist)
+    ]
+    if args.vars == "all":
+        vars = available_vars
+    else:
+        vars = args.vars.strip().split(",")
 
     outdir = f"{args.outdir}/{args.campaign}/{args.workflow}_/"
     if not os.path.isdir(outdir):

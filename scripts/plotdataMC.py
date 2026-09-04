@@ -253,7 +253,7 @@ def main(args):
         # Skip missing and empty hists
         check_flow = args.flow in ("show", "sum")
         if discr not in collated["mc"].keys() or discr not in collated["data"].keys():
-            print(discr, "not in files, skipping")
+            # print(discr, "not in files, skipping")
             continue
         elif (collated["mc"][discr].values(flow=check_flow) == 0).all() or (
             collated["data"][discr].values(flow=check_flow) == 0
@@ -737,7 +737,8 @@ def main(args):
             name += "_log"
             ax.set_yscale("log")
             ax.set_ylim(bottom=0.1)
-            hep.mpl_magic(ax=ax)
+            # hep.mpl_magic(ax=ax)
+            hep.yscale_legend(ax=ax, soft_fail=True)
 
         if args.logx:
             name += "_logx"
