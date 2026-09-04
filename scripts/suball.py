@@ -186,11 +186,11 @@ if __name__ == "__main__":
         ):
             if args.debug:
                 print(
-                    f"Creating MC dataset: python scripts/fetch.py -c {args.campaign} --from_workflow {wf} --DAS_campaign {args.DAS_campaign} --year {args.year} {overwrite} --skipvalidation --executor futures"
+                    f"Creating MC dataset: python scripts/fetch.py -c {args.campaign} --from_workflow {wf} --DAS_campaign {args.DAS_campaign} --year {args.year} {overwrite} --skipvalidation --executor futures --workers {args.workers}"
                 )
 
             os.system(
-                f"python scripts/fetch.py -c {args.campaign} --from_workflow {wf} --DAS_campaign {args.DAS_campaign} --year {args.year} {overwrite} --skipvalidation --executor futures"
+                f"python scripts/fetch.py -c {args.campaign} --from_workflow {wf} --DAS_campaign {args.DAS_campaign} --year {args.year} {overwrite} --skipvalidation --executor futures --workers {args.workers}"
             )
             if args.debug:
                 os.system(f"ls metadata/{args.campaign}/*.json")
@@ -262,6 +262,8 @@ if __name__ == "__main__":
                     elif key == "skip_structure_validation":
                         if value == True:
                             runner_config += f" --skip-structure-validation"
+                    elif key == "ttbar_reweights":
+                        runner_config += f" --ttbar-reweights={value}"
                     elif value is not None:
                         if key == "limit":
                             runner_config += f" --{key}={value}"
