@@ -370,8 +370,10 @@ def histo_writter(pruned_ev, output, weights, systematics, isSyst, SF_map):
                                 weight=weight_masked,
                             )
                         else:
-                            tagger, *_ = histname.split("_")
+                            # split jet index
+                            *tagger, _ = histname.split("_")                            
                             if "noSF" in histname:
+                                tagger = tagger[0]
                                 h.fill(
                                     syst=syst,
                                     flav=flav,
@@ -379,6 +381,7 @@ def histo_writter(pruned_ev, output, weights, systematics, isSyst, SF_map):
                                     weight=weights.partial_weight(exclude=[tagger]),   
                                 )
                             else:
+                                tagger = "_".join(tagger)
                                 h.fill(
                                     syst=syst,
                                     flav=flav,
