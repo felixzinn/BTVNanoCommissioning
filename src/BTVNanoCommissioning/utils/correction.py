@@ -2162,10 +2162,10 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
         systlist = [
             "hf",
             "lf",
-            "cferr1",
-            "cferr2",
-            "hfstat1",
-            "hfstat2",
+            # "cferr1",
+            # "cferr2",
+            "hfstats1",
+            "hfstats2",
             "lfstats1",
             "lfstats2",
         ]
@@ -2280,8 +2280,8 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
                             masknone,
                             1.0,
                             correct_map["btag"][key].evaluate(
-                                f"up_{systlist[i]}",
-                                jet.hadronFlavour,
+                                f"{systlist[i]}_Up",
+                                flavour,
                                 abs_jet_eta,
                                 jet.pt,
                                 btag_value
@@ -2291,8 +2291,8 @@ def btagSFs(jet, correct_map, weights, SFtype, syst=False):
                             masknone,
                             1.0,
                             correct_map["btag"][key].evaluate(
-                                f"down_{systlist[i]}",
-                                jet.hadronFlavour,
+                                f"{systlist[i]}_Down",
+                                flavour,
                                 abs_jet_eta,
                                 jet.pt,
                                 btag_value
@@ -3947,13 +3947,17 @@ def weight_manager(pruned_ev, SF_map, isSyst, ttbar_reweights=None, campaign=Non
             muSFs(pruned_ev.SelMuon, SF_map, weights, syst_wei, False)
         if "EGM" in SF_map.keys() and "SelElectron" in pruned_ev.fields:
             eleSFs(pruned_ev.SelElectron, SF_map, weights, syst_wei, False)
-        if "btag" in SF_map.keys() and "SelJet" in pruned_ev.fields:
-            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetC", syst_wei)
-            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetB", syst_wei)
-            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVB", syst_wei)
-            # btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVC", syst_wei)
-            if "btagUParTAK4B" in pruned_ev.SelJet.fields:
-                btagSFs(pruned_ev.SelJet, SF_map, weights, "btagUParTAK4B", syst_wei)
+        # if "btag" in SF_map and "SelJet" in pruned_ev.fields:
+        #     btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetC", syst_wei)
+        #     btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepJetB", syst_wei)
+        #     btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVB", syst_wei)
+        #     btagSFs(pruned_ev.SelJet, SF_map, weights, "DeepCSVC", syst_wei)
+        if (
+            "btag" in SF_map
+            and "SelJet" in pruned_ev.fields
+            and "btagUParTAK4B" in pruned_ev.SelJet.fields
+        ):
+            btagSFs(pruned_ev.SelJet, SF_map, weights, "btagUParTAK4B", True)
 
     return weights
 
