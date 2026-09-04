@@ -300,7 +300,7 @@ class NanoProcessor(processor.ProcessorABC):
         # Configure histograms
         if not self.noHist:
             output = histo_writter(
-                pruned_ev, output, weights, systematics, self.isSyst, self.SF_map
+                pruned_ev, output, weights, systematics, True, self.SF_map
             )
         # Output arrays
         if self.isArray:
@@ -311,3 +311,31 @@ class NanoProcessor(processor.ProcessorABC):
 
     def postprocess(self, accumulator):
         return accumulator
+
+
+if __name__ == "__main__":
+    import uproot
+    from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
+
+    filename = "root://osg-se.sprace.org.br:1094//store/data/Run2024C/Muon0/NANOAOD/BTVNANOv15-v1/120000/8ce9fa2a-959f-4382-a7e8-c497913df3cc.root"
+    dataset_name = "Muon0Run2024C"
+    # filename = "root://xrootd01.jinr-t1.ru:1094//pnfs/jinr-t1.ru/data/cms/store/mc/RunIII2024Summer24NanoAODv15/TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/BTVNanoV15_150X_mcRun3_2024_realistic_v2-v1/90001/fed04893-dd2b-47c2-a7e6-fbd25375d25e.root"
+    # dataset_name = "TTtoLNu2Q_TuneCP5_13p6TeV_powheg-pythia8"
+    with uproot.open(filename) as file:
+        chunksize = 1000
+        events = NanoEventsFactory.from_root(
+            file,
+            entry_stop=chunksize,
+            schemaclass=NanoAODSchema,
+            metadata={"dataset": dataset_name, "filename": filename},
+        ).events()
+
+        p = NanoProcessor(
+            year="2024",
+            campaign="Summer24",
+            isSyst=False,
+            isArray=False,
+            noHist=False,
+            chunksize=chunksize,
+        )
+        output = p.process(events)[dataset_name]

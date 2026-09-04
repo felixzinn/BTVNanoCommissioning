@@ -236,7 +236,7 @@ class NanoProcessor(processor.ProcessorABC):
         # Configure histograms
         if not self.noHist:
             output = histo_writer(
-                pruned_ev, output, weights, systematics, self.isSyst, self.SF_map
+                pruned_ev, output, weights, systematics, True, self.SF_map
             )
         # Output arrays
         if self.isArray:
@@ -253,6 +253,9 @@ if __name__ == "__main__":
     import uproot
     from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
 
+    # filename = "root://ccxrdcms.in2p3.fr:1094//store/data/Run2024C/MuonEG/NANOAOD/BTVNANOv15-v2/120000/1b8752d6-80e4-45ab-9f41-d32ebd807a8b.root"
+    # filename = "root://xrootd-cms.infn.it:1194//store/data/Run2024F/MuonEG/NANOAOD/BTVNANOv15-v2/120000/d85520b9-e60a-4ebe-855b-ebac99924b41.root"
+    # dataset_name = "Run2024C"
     filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/RunIII2024Summer24NanoAODv15/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/BTVNanoV15_150X_mcRun3_2024_realistic_v2-v1/90001/bf7cfb40-cf7c-459c-8740-ef103868eba7.root"
     dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
     with uproot.open(filename) as file:
