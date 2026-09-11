@@ -94,7 +94,7 @@ def define_histograms(
             axes["flav"],
             abs_eta,
             custom_pt,
-            axes["dR_jets"],
+            # axes["dR_jets"],
             region_axis,
             jet_index_axis,
             axes[btagger],
@@ -152,7 +152,7 @@ def fill_histograms(
                     flav=flavor_probe,
                     eta=np.abs(probe_jet.eta),
                     pt=probe_jet.pt,
-                    dR_jets=events.dR_jets,
+                    # dR_jets=events.dR_jets,
                     region=events[f"region_{btagger}_{i_probe_jet}"],
                     jet_index=i_probe_jet,
                     **{

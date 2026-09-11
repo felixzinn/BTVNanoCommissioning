@@ -137,12 +137,12 @@ def main(input_paths, output_path, lumi):
             # index is (systematic, flavor, eta, pt, dR_jets, region, jet_index, btag_discriminant)
             for region in data_hist.axes["region"]:
                 data_hist_region = data_hist[
-                    "nominal", sum, sum, sum, sum, region, sum, :
+                    "nominal", sum, sum, sum, region, sum, :
                 ]
 
                 # split by sample
                 mc_sum = {
-                    sample: hist["nominal", sum, sum, sum, sum, region, sum, :]
+                    sample: hist["nominal", sum, sum, sum, region, sum, :]
                     for sample, hist in mc_histograms.items()
                 }
                 fig_suptitle = f"{region} region"
@@ -161,18 +161,17 @@ def main(input_paths, output_path, lumi):
                 # c=4, b=5, light=0,1,6
                 mc_flavor = {
                     "b": sum(
-                        hist["nominal", hist_lib.loc(5), sum, sum, sum, region, sum, :]
+                        hist["nominal", hist_lib.loc(5), sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "c": sum(
-                        hist["nominal", hist_lib.loc(4), sum, sum, sum, region, sum, :]
+                        hist["nominal", hist_lib.loc(4), sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "l": sum(
                         hist[
                             "nominal",
                             [hist_lib.loc(v) for v in (0, 1, 6)],
-                            sum,
                             sum,
                             sum,
                             region,
