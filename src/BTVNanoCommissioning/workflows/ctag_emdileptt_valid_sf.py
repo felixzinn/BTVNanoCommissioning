@@ -171,7 +171,7 @@ class NanoProcessor(processor.ProcessorABC):
 
         # Muon jet cuts
         smu_iso = ak.all(
-            events.Jet.metric_table(soft_muon) > 0.4, axis=2, mask_identity=True
+            events.Jet.metric_table(soft_muon) < 0.4, axis=2, mask_identity=True
         )
         mujetsel = ak.fill_none(
             smu_iso & ((events.Jet.muonIdx1 != -1) | (events.Jet.muonIdx2 != -1)),
@@ -257,7 +257,13 @@ class NanoProcessor(processor.ProcessorABC):
         #     Output       #
         ####################
         # Configure SFs
-        weights = weight_manager(pruned_ev, self.SF_map, self.isSyst)
+        weights = weight_manager(
+            pruned_ev,
+            self.SF_map,
+            self.isSyst,
+            ttbar_reweights=getattr(self, "ttbar_reweights", "none"),
+            campaign=self._campaign,
+        )
         # Configure systematics
         if shift_name is None:
             systematics = ["nominal"] + list(weights.variations)

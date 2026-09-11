@@ -76,6 +76,8 @@ def validate_dataset_structure(fileset, max_files_per_sample=None):
                         f"WARNING: File has too few branches ({len(branches)}): {filename}"
                     )
                     # print(f"Branches present: {branches}")
+                    if fast_mode and filename in valid_files:
+                        valid_files.remove(filename)
                     continue
 
                 # Check required branches
@@ -84,6 +86,8 @@ def validate_dataset_structure(fileset, max_files_per_sample=None):
                     print(
                         f"WARNING: File missing critical branches {missing}: {filename}"
                     )
+                    if fast_mode and filename in valid_files:
+                        valid_files.remove(filename)
                     continue
 
                 if not any(met in branches for met in optional_met_branches):
@@ -91,6 +95,8 @@ def validate_dataset_structure(fileset, max_files_per_sample=None):
                         "WARNING: File missing MET branch; expected one of "
                         f"{optional_met_branches}: {filename}"
                     )
+                    if fast_mode and filename in valid_files:
+                        valid_files.remove(filename)
                     continue
 
                 # Check event count
@@ -98,6 +104,8 @@ def validate_dataset_structure(fileset, max_files_per_sample=None):
                     print(
                         f"WARNING: File has too few events ({len(events)}): {filename}"
                     )
+                    if fast_mode and filename in valid_files:
+                        valid_files.remove(filename)
                     continue
 
                 # File passed all checks
@@ -229,6 +237,7 @@ def config_parser(parser):
         default="Summer23",
         help="Dataset campaign, change the corresponding correction files",
     )
+    parser.add_argument("--selectionModifier", default="")
     parser.add_argument(
         "--isSyst",
         default="False",
@@ -244,6 +253,16 @@ def config_parser(parser):
             "JP_MC",
         ],
         help="Run with systematics (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--ttbar-reweights",
+        default="none",
+        choices=["none", "hdamp_ml", "full"],
+        help=(
+            "Enable additional ttbar event reweights in correction.py. "
+            "'hdamp_ml' applies hdamp ONNX up/down; 'full' additionally reserves "
+            "hooks for frag/decay reweights."
+        ),
     )
     parser.add_argument("--isArray", action="store_true", help="Output root files")
     parser.add_argument(
@@ -401,6 +420,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.isSyst == "False":
         args.isSyst = False
+    os.environ["BTV_TTBAR_REWEIGHTS"] = args.ttbar_reweights
     print("Running with the following options:")
     print(args)
     ogoutput = args.output
@@ -417,12 +437,12 @@ if __name__ == "__main__":
         index = args.samplejson.rfind("/") + 1
         sample_json = args.samplejson[index:]
         histoutdir = (
-            f"{outdirprefix}hists_{args.workflow}_{sample_json.rstrip('.json')}"
+            f"{outdirprefix}hists_{args.workflow}_{sample_json.replace('.json', '')}"
         )
-        outdir = f"{outdirprefix}arrays_{args.workflow}_{sample_json.rstrip('.json')}"
-        coffeaoutput = (
-            f'{histoutdir}/hists_{args.workflow}_{(sample_json).rstrip(".json")}.coffea'
+        outdir = (
+            f"{outdirprefix}arrays_{args.workflow}_{sample_json.replace('.json', '')}"
         )
+        coffeaoutput = f"{histoutdir}/hists_{args.workflow}_{sample_json.replace('.json', '')}.coffea"
     if not args.noHist:
         os.system(f"mkdir -p {histoutdir}")
     # load dataset
@@ -471,6 +491,20 @@ if __name__ == "__main__":
                 if args.only in sample_dict[key]:
                     sample_dict = dict([(key, [args.only])])
 
+    empty_samples = [sample for sample, files in sample_dict.items() if len(files) == 0]
+    if empty_samples:
+        print("Warning: dropping empty datasets from sample JSON:")
+        for sample in empty_samples:
+            print(f"  {sample}")
+        sample_dict = {
+            sample: files for sample, files in sample_dict.items() if len(files) > 0
+        }
+
+    if len(sample_dict) == 0:
+        raise RuntimeError(
+            f"No input files left to process after filtering {args.samplejson}."
+        )
+
     # Scan if files can be opened
     if args.validate:
         start = time.time()
@@ -517,7 +551,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # load workflow
-    processor_instance = workflows[args.workflow](
+    proc_args = [
         args.year,
         args.campaign,
         outdir,
@@ -525,7 +559,12 @@ if __name__ == "__main__":
         args.isArray,
         args.noHist,
         args.chunk,
-    )
+    ]
+    if args.selectionModifier != "":
+        proc_args.append(args.selectionModifier)
+
+    processor_instance = workflows[args.workflow](*proc_args)
+    setattr(processor_instance, "ttbar_reweights", args.ttbar_reweights)
 
     if args.skip_structure_validation:
         print("Skipping dataset structure validation (--skip-structure-validation).")
@@ -541,7 +580,7 @@ if __name__ == "__main__":
         from coffea.util import save
 
         empty_output = {}  # Minimal dict output
-        outname = os.path.join(args.outputdir, args.output)
+        outname = coffeaoutput
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         save(empty_output, outname)
         print(f"Empty output file created successfully at {outname}")
@@ -681,12 +720,14 @@ if __name__ == "__main__":
                         raise Exception("Invalid input, exiting")
 
                 if not skip_tar:
+                    jobdirs = [d for d in os.listdir(base_dir) if d.startswith("jobs_")]
                     make_tarfile(
                         "BTVNanoCommissioning.tar.gz",
                         base_dir,
                         exclude_dirs=[
                             "BTVNanoCommissioning.egg-info",
-                        ],
+                        ]
+                        + jobdirs,
                     )
             import shutil
 
@@ -1099,7 +1140,10 @@ if __name__ == "__main__":
             if "brux" in args.executor:
                 cluster.adapt(minimum=args.scaleout, maximum=336)
             else:
-                cluster.adapt(minimum=args.scaleout)
+                # Cap the maximum number of workers at args.scaleout. Without an
+                # explicit maximum, dask's adaptive scaler grows the worker count
+                # without bound and floods the schedd, tripping MAX_JOBS_PER_OWNER.
+                cluster.adapt(minimum=1, maximum=args.scaleout)
             client = Client(cluster)
             print("Waiting for at least one worker...")
             client.wait_for_workers(1)

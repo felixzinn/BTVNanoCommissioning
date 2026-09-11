@@ -403,15 +403,11 @@ if __name__ == "__main__":
             year="2024",
             campaign="Summer24",
             output_directory="./output",
-            # isSyst="JERC_full",
-            isSyst=False,
+            isSyst="JEC_full",
+            # isSyst=False,
             isArray=False,
             noHist=False,
             chunksize=chunk_size,
             channel="mumu",
         )
         output = p.process(events)[dataset_name]
-
-        from IPython import embed
-
-        embed()

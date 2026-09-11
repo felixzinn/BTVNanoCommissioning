@@ -23,9 +23,14 @@ color_map = {
     "DY": "#ff5e02",
     "QCD": "#adad7d",
     "QCD($\\mu$)": "#656364",
+    "Ph+jets": "#f2ab6d",
     # https://btvweb.web.cern.ch/artworks/BTV_colorpalette/Palette.png
     "udsg": "#15a3ef",  # blue
+    "ud": "#15a3ef",  # blue
+    "s": "#209A24",  # green
+    "g": "#7a21dd",  # purple
     "pu": "#717581",  # grey
+    "other": "#717581",  # grey
     "c": "#ed1e02",  # red
     "b": "#fcb302",  # yellow
 }
@@ -69,6 +74,7 @@ sample_mergemap = {
         "ST_s-channel_4f_leptonDecays_TuneCP5_13TeV-amcatnlo-pythia8",
         "TBbartoLNu-s-channel_TuneCP5_13p6TeV_powheg-pythia8",
         "TbarBtoLNu-s-channel_TuneCP5_13p6TeV_powheg-pythia8",
+        "ST_t-channel_antitop_4f_InclusiveDecays_TuneCP5_13TeV-powheg-madspin-pythia8",
     ],
     "tt+X": [
         "TTLNu-1Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
@@ -130,6 +136,9 @@ sample_mergemap = {
         "WtoLNu-4Jets_Bin-2J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_Bin-3J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoLNu-4Jets_Bin-4J_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "WtoLNu-2Jets_0J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoLNu-2Jets_1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoLNu-2Jets_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         # lepton binned samples
         "WtoENu-4Jets_TuneCP5_13p6TeV_madgraphMLM-pythia8",
         "WtoMuNu-4Jets_TuneCP5_13p6TeV_madgraphMLM-pythia8",
@@ -137,6 +146,18 @@ sample_mergemap = {
         "WtoENu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "WtoMuNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "WtoTauNu-2Jets_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        # run2
+        "WJetsToLNu_TuneCP5_13TeV-madgraphMLM-pythia8",
+        # jet and lepton binned samples
+        "WtoENu-2Jets_Bin-0J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoENu-2Jets_Bin-1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoENu-2Jets_Bin-2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoMuNu-2Jets_Bin-0J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoMuNu-2Jets_Bin-1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoMuNu-2Jets_Bin-2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoTauNu-2Jets_Bin-0J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoTauNu-2Jets_Bin-1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        "WtoTauNu-2Jets_Bin-2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
     ],
     "DY": [
         "DYto2L-2Jets_Bin-1J-MLL-50-PTLL-40to100_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
@@ -155,6 +176,9 @@ sample_mergemap = {
         "DYto2Mu-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "DYto2Tau-2Jets_Bin-MLL-10to50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
         "DYto2Tau-2Jets_Bin-MLL-50_TuneCP5_13p6TeV_amcatnloFXFX-pythia8",
+        # Run 2
+        "DYJetsToLL_M-50_TuneCP5_13TeV-amcatnloFXFX-pythia8",
+        "DYJetsToLL_M-10to50_TuneCP5_13TeV-amcatnloFXFX-pythia8",
     ],
     # QCD
     "QCD": [
@@ -210,6 +234,17 @@ sample_mergemap = {
         "QCD_Bin-PT-2000to2500_TuneCP5_13p6TeV_pythia8",
         "QCD_Bin-PT-2500to3000_TuneCP5_13p6TeV_pythia8",
         "QCD_Bin-PT-3000_TuneCP5_13p6TeV_pythia8",
+        # Run 2:
+        "QCD_Pt-30To50_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-50To80_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-80To120_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-120To170_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-170To300_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-300To470_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-470To600_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-600To800_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-800To1000_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
+        "QCD_Pt-1000_MuEnrichedPt5_TuneCP5_13TeV-pythia8",
     ],
     # QCD muon enriched
     "QCD($\\mu$)": [
@@ -225,6 +260,29 @@ sample_mergemap = {
         "QCD_PT-600to800_MuEnrichedPt5_TuneCP5_13p6TeV_pythia8",
         "QCD_PT-800to1000_MuEnrichedPt5_TuneCP5_13p6TeV_pythia8",
         "QCD_PT-1000_MuEnrichedPt5_TuneCP5_13p6TeV_pythia8",
+    ],
+    "Ph+jets": [
+        "GJ-4Jets_HT-100to200_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_HT-40to70_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_HT-600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_HT-70to100_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-100to200_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-40to100_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-10to100_HT-600to1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-100to200_HT-1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-100to200_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-100to200_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-100to200_HT-40to200_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-100to200_HT-600to1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-200_HT-1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-200_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-200_HT-40to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+        "GJ-4Jets_dRGJ-0p25_PTG-200_HT-600to1000_TuneCP5_13p6TeV_madgraphMLM-pythia8",
     ],
 }
 ### copy functions coffea.hist.plotratio https://github.com/CoffeaTeam/coffea/blob/master/coffea/hist/plot.py to boost-hist
@@ -486,10 +544,9 @@ def plotratio(
             sumw_denom[-1] + denom.view(flow=True)["value"][-1],
             sumw2_denom[-1] + denom.view(flow=True)["value"][-1],
         )
-    else:
-        sumw_num, sumw2_num = num.values(), num.variances()
-        sumw_denom, sumw2_denom = denom.values(), denom.variances()
+
     rsumw = sumw_num / sumw_denom
+
     if unc == "clopper-pearson":
         rsumw_err = np.abs(clopper_pearson_interval(sumw_num, sumw_denom) - rsumw)
     elif unc == "poisson-ratio":
@@ -526,6 +583,7 @@ def plotratio(
         emarker = opts.pop("emarker", "")
         errbar = ax.errorbar(x=centers, y=rsumw, xerr=ranges, yerr=rsumw_err, **opts)
         plt.setp(errbar[1], "marker", emarker)
+
     if denom_fill_opts is not None:
         unity = np.ones_like(sumw_denom)
         denom_unc = poisson_interval(unity, sumw2_denom / sumw_denom**2)
@@ -551,6 +609,7 @@ def plotratio(
             )
             opts = denom_fill_opts
         ax.stairs(denom_unc[0], edges=edges, baseline=denom_unc[1], **opts)
+
     if guide_opts is not None:
         opts = {"linestyle": "--", "color": (0, 0, 0, 0.5), "linewidth": 1}
         opts.update(guide_opts)

@@ -22,3 +22,4 @@ dependencies:
     - coffea==0.7.31
     - correctionlib==2.7.0
     - hist>=2.9.0
+    - onnxruntime

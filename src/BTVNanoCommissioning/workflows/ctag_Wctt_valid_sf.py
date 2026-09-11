@@ -451,7 +451,13 @@ class NanoProcessor(processor.ProcessorABC):
         # Weight & Geninfo #
         ####################
 
-        weights = weight_manager(pruned_ev, self.SF_map, self.isSyst)
+        weights = weight_manager(
+            pruned_ev,
+            self.SF_map,
+            self.isSyst,
+            ttbar_reweights=getattr(self, "ttbar_reweights", "none"),
+            campaign=self._campaign,
+        )
 
         if shift_name is None:
             systematics = ["nominal"] + list(weights.variations)
@@ -553,6 +559,8 @@ class NanoProcessor(processor.ProcessorABC):
                             str(i) in histname
                             and histname.replace(f"_{i}", "") not in events.Jet.fields
                         ):
+                            continue
+                        if str(i) not in histname:
                             continue
                         h.fill(
                             syst="noSF",

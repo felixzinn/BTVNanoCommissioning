@@ -38,10 +38,13 @@ def get_histograms(axes, **kwargs):
         for stringency in wps[tagger]["b"].keys():
             if "No" in stringency:
                 continue
-            hists[f"{tagger}{stringency}_postag_jet_pt"] = Hist.Hist(
+            hists[f"{tagger}{stringency}_negtag_jet_pt"] = Hist.Hist(
                 axes["syst"], axes["flav"], axes["ljpt"], Hist.storage.Weight()
             )
-            hists[f"{tagger}{stringency}_negtag_jet_pt"] = Hist.Hist(
+        for stringency in wps[tagger]["c"].keys():
+            if "No" in stringency:
+                continue
+            hists[f"{tagger}{stringency}_negtag_jet_cWP_pt"] = Hist.Hist(
                 axes["syst"], axes["flav"], axes["ljpt"], Hist.storage.Weight()
             )
     hists["jet_pt"] = Hist.Hist(

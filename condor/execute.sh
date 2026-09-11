@@ -1,6 +1,7 @@
 #!/bin/bash -x
 
 JOBID=$1
+NCPU=$2
 
 export HOME=`pwd`
 if [ -d /afs/cern.ch/user/${USER:0:1}/$USER ]; then
@@ -13,7 +14,8 @@ WORKDIR=`pwd`
 
 # Get arguments
 declare -A ARGS
-for key in workflow output samplejson year campaign isSyst isArray noHist overwrite voms chunk skipbadfiles outputDir remoteRepo; do
+for key in workflow output samplejson year campaign isSyst ttbar_reweights isArray noHist overwrite voms chunk skipbadfiles outputDir remoteRepo; do
+    echo $(jq -r ".$key" $WORKDIR/arguments.json)
     ARGS[$key]=$(jq -r ".$key" $WORKDIR/arguments.json)
 done
 
@@ -68,7 +70,11 @@ pip install -e .
 pip install psutil
 
 # Build the sample json given the job id
-python -c "import json; json.dump(json.load(open('$WORKDIR/split_samples.json'))['$JOBID'], open('sample.json', 'w'), indent=4)"
+python -c "import json, os; flname = 'split_samples.json' if os.path.isfile(f'$WORKDIR/split_samples.json') else 'split_samples_resubmit.json';  json.dump(json.load(open(f'$WORKDIR/{flname}'))['$JOBID'], open('$WORKDIR/sample.json', 'w'), indent=4)"
+cp $WORKDIR/sample.json $WORKDIR/BTVNanoCommissioning/sample.json
+
+ls -lah $WORKDIR
+ls -lah $WORKDIR/BTVNanoCommissioning
 
 # Unparse arguments and send to runner.py
 OPTS="--wf ${ARGS[workflow]} --year ${ARGS[year]} --campaign ${ARGS[campaign]} --chunk ${ARGS[chunk]}"
@@ -78,7 +84,9 @@ fi
 if [ "${ARGS[isSyst]}" != "false" ]; then
     OPTS="$OPTS --isSyst ${ARGS[isSyst]}"
 fi
-
+if [ "${ARGS[ttbar_reweights]}" != "none" ]; then
+    OPTS="$OPTS --ttbar-reweights ${ARGS[ttbar_reweights]}"
+fi
 for key in  isArray noHist overwrite skipbadfiles; do
     if [ "${ARGS[$key]}" == true ]; then
         OPTS="$OPTS --$key"
@@ -86,8 +94,16 @@ for key in  isArray noHist overwrite skipbadfiles; do
 done
 OPTS="$OPTS --output ${ARGS[output]//.coffea/_$JOBID.coffea}"  # add a suffix to output file name
 OPTS="$OPTS --json sample.json"  # use the sample json for this JOBID
-OPTS="$OPTS --worker 1"  # use number of worker = 1
-OPTS="$OPTS --executor iterative"
+
+# Check the number of CPUs requested and set the worker accordingly.
+# If nCPU > 1, use futures executor with nCPU workers. If nCPU = 1, use iterative executor with 1 worker.
+if [ $NCPU -gt 1 ]; then
+    OPTS="$OPTS --worker $NCPU"  # use number of worker = nCPU
+    OPTS="$OPTS --executor futures"
+else
+    OPTS="$OPTS --worker 1"  # use number of worker = 1
+    OPTS="$OPTS --executor iterative"
+fi
 
 # Launch
 echo "Now launching: python runner.py $OPTS"
