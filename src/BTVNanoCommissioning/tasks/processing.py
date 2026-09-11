@@ -1,9 +1,11 @@
 import os
+import shutil
 import subprocess
 
 import law
 import luigi
 import luigi.util
+import parsl
 
 from BTVNanoCommissioning.tasks.base import baseparameters
 from BTVNanoCommissioning.tasks.datasets import FetchDatasets
@@ -36,9 +38,22 @@ class processingparameters(luigi.Config):
         default=250_000,
         description="Chunk size for processing",
     )
+    memory = luigi.FloatParameter(
+        default=4.0,
+        description="Memory in GB for coffea processing",
+    )
     is_syst = luigi.ChoiceParameter(
         default="False",
-        choices=["False", "all", "weight_only", "JERC_split", "JP_MC"],
+        choices=[
+            "False",
+            "all",
+            "weight_only",
+            "JEC_full",
+            "JEC_reduced",
+            "JEC_reduced_JER_split",
+            "JEC_total",
+            "JP_MC",
+        ],
         description="Whether to run systematic variations",
     )
     skip_structure_validation = luigi.BoolParameter(
@@ -74,6 +89,9 @@ class ProcessDatasets(ProcessBase):
 
     def run(self):
         self.output().parent.touch()
+
+        rundir = os.path.join(self.output_base, "runinfo")
+
         cmd = [
             "python",
             "runner.py",
@@ -97,6 +115,8 @@ class ProcessDatasets(ProcessBase):
             str(self.chunksize),
             "--isSyst",
             self.is_syst,
+            "--rundir",
+            str(rundir),
         ]
         if self.limit is not None:
             cmd += ["--limit", str(self.limit)]
@@ -104,11 +124,17 @@ class ProcessDatasets(ProcessBase):
             cmd += ["--max", str(self.max_chunks)]
         if self.skip_structure_validation:
             cmd += ["--skip-structure-validation"]
+        if self.skipbadfiles:
+            cmd += ["--skipbadfiles"]
 
         subprocess.run(
             cmd,
             check=True,
         )
+
+        # remove runinfo folder to prevent large storage usage
+        if os.path.exists(rundir):
+            shutil.rmtree(rundir, ignore_errors=True)
 
     @property
     def output_file_base(self):
@@ -179,20 +205,21 @@ class ProcessBTagIterative(law.WrapperTask):
     def requires(self):
         reqs = {"lumi": [], "coffea": []}
         for dataset_file in self.definition_files:
-            stem = os.path.basename(os.path.splitext(dataset_file)[0])
-            if "data" in stem:
+            stem = os.path.splitext(dataset_file)[0]
+            basename = os.path.basename(stem)
+            if "data" in basename:
                 reqs["lumi"].append(
                     GetLuminosity.req(
                         self,
                         json=f"{stem}.json",
-                        output_file=f"{os.path.basename(stem)}_hists.coffea",
+                        output_file=f"{basename}_hists.coffea",
                     )
                 )
             reqs["coffea"].append(
                 ProcessDatasets.req(
                     self,
                     json=f"{stem}.json",
-                    output_file=f"{os.path.basename(stem)}_hists.coffea",
+                    output_file=f"{basename}_hists.coffea",
                 )
             )
         return reqs

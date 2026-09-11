@@ -366,6 +366,11 @@ def scaleout_parser(parser):
         help=f"(Specific for dask/lxplus file splitting, default: %(default)s)\n   Format: $dict_index_start,$file_index_start,$dict_index_stop,$file_index_stop. Stop indices are optional. $dict_index refers to the index, splitted $dict_index and $file_index with ','"
         "$dict_index refers to the sample dictionary of the samples json file. $file_index refers to the N-th batch of files per dask-worker, with its size being defined by the option --index. The job will start (stop) submission from (with) the corresponding indices.",
     )
+    parser.add_argument(
+        "--rundir",
+        default="runinfo",
+        help="Directory to store parsl logs (default: %(default)s)",
+    )
     return parser
 
 
@@ -985,6 +990,7 @@ if __name__ == "__main__":
                         )
                     ],
                     retries=args.retries,
+                    run_dir=args.rundir,
                 )
                 if splitjobs:
                     htex_config = Config(
@@ -1024,6 +1030,7 @@ if __name__ == "__main__":
                         ],
                         retries=args.retries,
                         retry_handler=retry_handler,
+                        run_dir=args.rundir,
                     )
 
         else:
