@@ -33,8 +33,8 @@ def set_symmetric_limits(ax: Axis, min_y: float = 0.0, max_y: float = 2.0):
 def plot_1D_histogram(
     mc_histograms: dict[str, Hist],
     data: Hist = None,
-    lumi: float = None,
-    suptitle: str = None,
+    lumi: float | None = None,
+    suptitle: str | None = None,
     ax: Axis = None,
     plot_ratio: bool = True,
 ) -> tuple[Figure, tuple[Axis, Axis]]:

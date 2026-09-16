@@ -60,6 +60,13 @@ def main(input_paths, output_path, lumi):
     output = {key: value for path in input_paths for key, value in load(path).items()}
     output.pop("xsection")
 
+    # remove systematics from histograms, keep only nominal
+    for sample, histograms in output.items():
+        for variable, histogram in histograms.items():
+            if isinstance(histogram, Hist) and "syst" in histogram.axes.name:
+                # remove systematics axis if present
+                output[sample][variable] = histogram["nominal", ...]
+
     # Set up output directory
     output_path = pathlib.Path(output_path)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -72,20 +79,22 @@ def main(input_paths, output_path, lumi):
     # merge samples
     sample_mergemap.pop("Z+jets", None)  # Z+jets and DY are double
     merge_map = sample_mergemap | {
-        "mc": [sample for sample in output.keys() if "Run" not in sample],
-        "data": [sample for sample in output.keys() if "Run" in sample],
+        "mc": [sample for sample in output if "Run" not in sample],
+        "data": [sample for sample in output if "Run" in sample],
     }
-    collated = collate(output, merge_map)
+    collated = {
+        key: value for key, value in collate(output, merge_map).items() if value is not None
+    }
 
     # samples in output
     samples = set(collated.keys()) - {"data", "mc"}
 
     # Loop over variables and plot
     non_plottable = {}
-    for variable, histogram in collated["mc"].items():
+    for variable, data_hist in collated["data"].items():
         # if "btag" not in variable:
         #     continue
-        if not isinstance(histogram, Hist):
+        if not isinstance(data_hist, Hist):
             continue
 
         variable_dir = output_path / variable
@@ -94,9 +103,8 @@ def main(input_paths, output_path, lumi):
         mc_histograms: dict[str, Hist] = {
             sample: collated[sample][variable]
             for sample in samples
-            if collated[sample] is not None
+            if variable in collated[sample]
         }
-        data_hist = collated["data"][variable]
 
         ndim_hist = next(iter(mc_histograms.values())).ndim
         # plot 1D histograms, i.e. kinematics
@@ -136,13 +144,11 @@ def main(input_paths, output_path, lumi):
             # sum over eta, pt, jet_index; loop over regions
             # index is (systematic, flavor, eta, pt, dR_jets, region, jet_index, btag_discriminant)
             for region in data_hist.axes["region"]:
-                data_hist_region = data_hist[
-                    "nominal", sum, sum, sum, region, sum, :
-                ]
+                data_hist_region = data_hist[sum, sum, sum, region, sum, :]
 
                 # split by sample
                 mc_sum = {
-                    sample: hist["nominal", sum, sum, sum, region, sum, :]
+                    sample: hist[sum, sum, sum, region, sum, :]
                     for sample, hist in mc_histograms.items()
                 }
                 fig_suptitle = f"{region} region"
@@ -161,16 +167,15 @@ def main(input_paths, output_path, lumi):
                 # c=4, b=5, light=0,1,6
                 mc_flavor = {
                     "b": sum(
-                        hist["nominal", hist_lib.loc(5), sum, sum, region, sum, :]
+                        hist[hist_lib.loc(5), sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "c": sum(
-                        hist["nominal", hist_lib.loc(4), sum, sum, region, sum, :]
+                        hist[hist_lib.loc(4), sum, sum, region, sum, :]
                         for hist in mc_histograms.values()
                     ),
                     "l": sum(
                         hist[
-                            "nominal",
                             [hist_lib.loc(v) for v in (0, 1, 6)],
                             sum,
                             sum,

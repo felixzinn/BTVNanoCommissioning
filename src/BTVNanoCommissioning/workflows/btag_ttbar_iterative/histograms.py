@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import awkward as ak
 import hist
@@ -104,6 +104,7 @@ def define_histograms(
 
     return histograms
 
+
 exclude_btv = [
     "UParTB",
     "robustParTB",
@@ -112,6 +113,8 @@ exclude_btv = [
     "DeepCSVB",
     "DeepCSVC",
 ]
+
+
 def fill_histograms(
     histograms: dict[str, dict[str | tuple[str, str], Hist]],
     events,

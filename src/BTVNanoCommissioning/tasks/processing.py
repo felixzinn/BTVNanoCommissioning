@@ -86,6 +86,10 @@ class ProcessDatasets(ProcessBase):
         default=False,
         description="Skip bad files during processing",
     )
+    splitjobs = luigi.BoolParameter(
+        default=False,
+        description="Whether to split merging into multiple parsl jobs",
+    )
 
     def run(self):
         self.output().parent.touch()
@@ -126,6 +130,8 @@ class ProcessDatasets(ProcessBase):
             cmd += ["--skip-structure-validation"]
         if self.skipbadfiles:
             cmd += ["--skipbadfiles"]
+        if self.splitjobs:
+            cmd += ["--splitjobs"]
 
         subprocess.run(
             cmd,

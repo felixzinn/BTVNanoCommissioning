@@ -108,7 +108,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
         ParT_name: str = (
             "btagUParTAK4B" if self._year == "2024" else "btagRobustParTAK4B"
         )
-        btaggers = (ParT_name, "btagDeepFlavB")
+        btaggers = (ParT_name,)  # "btagDeepFlavB"
         # if self._year == "2023":
         #     btaggers += ("btagDeepFlavB",)
         self.histogram_config: dict[
@@ -345,7 +345,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
                 assert not ak.any(hf_mask & lf_mask), "HF and LF regions overlap!"
 
                 pruned_events[f"region_{btagger}_{i_probe_jet}"] = ak.where(
-                    hf_mask, "HF", ak.where(lf_mask, "LF", "None")
+                    hf_mask, ["HF"], ak.where(lf_mask, ["LF"], ["None"])
                 )
 
         # =====================
@@ -391,6 +391,7 @@ if __name__ == "__main__":
         chunk_size = 1000
         events = NanoEventsFactory.from_root(
             file,
+            treepath="Events",
             entry_stop=chunk_size,
             schemaclass=NanoAODSchema,
             metadata={

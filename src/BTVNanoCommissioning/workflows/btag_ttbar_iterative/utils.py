@@ -25,19 +25,6 @@ def fill_none(array, fill_value=np.nan):
     return ak.fill_none(array, fill_value)
 
 
-def make_p4(obj):
-    """Generate 4-vector from a particle object."""
-    return ak.zip(
-        {
-            "pt": obj.pt,
-            "eta": obj.eta,
-            "phi": obj.phi,
-            "mass": obj.mass,
-        },
-        with_name="PtEtaPhiMCandidate",
-    )
-
-
 def min_dr(particles):
     """Get minimum delta R between pairs of particles."""
     di_particles = ak.combinations(
@@ -48,7 +35,7 @@ def min_dr(particles):
         fields=["p0", "p1"],
     )
     return ak.min(
-        make_p4(di_particles.p0).delta_r(make_p4(di_particles.p1)),
+        di_particles.p0.delta_r(di_particles.p1),
         axis=-1,
         mask_identity=False,
     )

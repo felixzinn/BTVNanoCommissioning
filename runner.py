@@ -328,6 +328,11 @@ def scaleout_parser(parser):
         "concurrent threads is ``workers x scaleout`` (default: %(default)s)",
     )
     parser.add_argument(
+        "--splitjobs",
+        default=False,
+        help="submit merging as jobs",
+    )
+    parser.add_argument(
         "--memory",
         type=float,
         default=4.0,
@@ -470,7 +475,7 @@ if __name__ == "__main__":
             ]
     # check file dict size - avoid large memory consumption for local machine
     filesize = np.sum(np.array([len(sample_dict[key]) for key in sample_dict.keys()]))
-    splitjobs = False
+    splitjobs = args.splitjobs
     if filesize > 200 and "lxplus" in args.executor:
         splitjobs = True
 
@@ -644,9 +649,10 @@ if __name__ == "__main__":
             f'export X509_CERT_DIR={os.environ["X509_CERT_DIR"]}',
             f"export PYTHONPATH=$PYTHONPATH:{os.getcwd()}",
         ]
-        pathvar = [i for i in os.environ["PATH"].split(":") if "envs/btv_coffea" in i][
-            0
-        ]
+        # pathvar = [i for i in os.environ["PATH"].split(":") if "envs/btv_coffea" in i][
+        #     0
+        # ]
+        pathvar = os.environ.get("CONDA_PREFIX", "")
         condor_extra = [
             f"export PATH={pathvar}:$PATH",
             f'source {os.environ["HOME"]}/.bashrc',
@@ -1020,7 +1026,7 @@ if __name__ == "__main__":
                                     nodes_per_block=1,
                                     cores_per_slot=args.workers,
                                     mem_per_slot=args.memory,
-                                    init_blocks=args.scaleout,
+                                    init_blocks=args.scaleout // 10,
                                     max_blocks=(args.scaleout) + 10,
                                     worker_init="\n".join(
                                         job_script_prologue + condor_extra
