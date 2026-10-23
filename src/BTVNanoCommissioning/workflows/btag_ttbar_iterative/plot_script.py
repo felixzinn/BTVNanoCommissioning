@@ -2,8 +2,12 @@ import argparse
 import pathlib
 import warnings
 
-from matplotlib.axis import Axis
 import mplhep
+from matplotlib.axis import Axis
+
+plot_style = mplhep.style.CMS | {
+    "figure.constrained_layout.use": True,
+}
 
 
 def clear_plots(directory):
@@ -36,12 +40,12 @@ parser.add_argument("--lumi", type=float, help="Luminosity in pb^-1")
 
 def ylog_scale(ax: Axis):
     ax.set_yscale("log")
-    ax.autoscale()
+    # ax.autoscale()
     mplhep.set_ylow(ax=ax)
     mplhep.yscale_legend(ax=ax, soft_fail=True)
 
 
-def main(input_paths, output_path, lumi):
+def main(input_paths, output_path, lumi, only_btag: bool = False):
     import pathlib
 
     import hist as hist_lib
@@ -57,15 +61,35 @@ def main(input_paths, output_path, lumi):
 
     # Load input files
     input_paths = [pathlib.Path(path.strip()) for path in input_paths.split(",")]
-    output = {key: value for path in input_paths for key, value in load(path).items()}
-    output.pop("xsection")
+    output = {}
+    for path in input_paths:
+        _out = load(path)
+        # coffea checkpointing writes tuple into output
+        if isinstance(_out, dict):
+            _out = {key: value for key, value in _out.items() if key != "xsection"}
+        elif isinstance(_out, tuple):
+            assert "xsection" in _out[0], (
+                "xsection not found in coffea output (tuple[0])"
+            )
+            _out = {key: value for key, value in _out[0].items() if key != "xsection"}
+        else:
+            raise TypeError(f"Unexpected type for coffea output: {type(_out)}")
 
-    # remove systematics from histograms, keep only nominal
-    for sample, histograms in output.items():
-        for variable, histogram in histograms.items():
-            if isinstance(histogram, Hist) and "syst" in histogram.axes.name:
-                # remove systematics axis if present
-                output[sample][variable] = histogram["nominal", ...]
+        # remove systematics from histograms, keep only nominal
+        for sample, histograms in _out.items():
+            if sample in output:
+                warnings.warn(
+                    f"Sample {sample} already exists in output, overwriting",
+                    stacklevel=2,
+                )
+            output[sample] = {"sumw": histograms["sumw"]}  # keep sumw for scaling
+            for variable, histogram in histograms.items():
+                if isinstance(histogram, Hist):
+                    if "syst" in histogram.axes.name:
+                        # remove systematics axis if present
+                        output[sample][variable] = histogram["nominal", ...]
+                    else:
+                        output[sample][variable] = histogram
 
     # Set up output directory
     output_path = pathlib.Path(output_path)
@@ -83,7 +107,9 @@ def main(input_paths, output_path, lumi):
         "data": [sample for sample in output if "Run" in sample],
     }
     collated = {
-        key: value for key, value in collate(output, merge_map).items() if value is not None
+        key: value
+        for key, value in collate(output, merge_map).items()
+        if value is not None
     }
 
     # samples in output
@@ -92,19 +118,25 @@ def main(input_paths, output_path, lumi):
     # Loop over variables and plot
     non_plottable = {}
     for variable, data_hist in collated["data"].items():
-        # if "btag" not in variable:
-        #     continue
+        if only_btag and "btag" not in variable:
+            continue
         if not isinstance(data_hist, Hist):
             continue
-
-        variable_dir = output_path / variable
-        variable_dir.mkdir(parents=True, exist_ok=True)
 
         mc_histograms: dict[str, Hist] = {
             sample: collated[sample][variable]
             for sample in samples
             if variable in collated[sample]
         }
+
+        if not mc_histograms:
+            warnings.warn(
+                f"No MC histograms found for variable {variable}", stacklevel=2
+            )
+            continue
+
+        variable_dir = output_path / variable
+        variable_dir.mkdir(parents=True, exist_ok=True)
 
         ndim_hist = next(iter(mc_histograms.values())).ndim
         # plot 1D histograms, i.e. kinematics
@@ -197,6 +229,17 @@ def main(input_paths, output_path, lumi):
                 ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_log.png")
 
+                fig, (ax, _) = plot_1D_histogram(
+                    mc_histograms=mc_flavor,
+                    data=data_hist_region,
+                    suptitle=fig_suptitle,
+                    lumi=lumi,
+                    stack=False,
+                )
+                fig.savefig(variable_dir / f"data_mc_{region}_byflav_nostack.png")
+                ylog_scale(ax)
+                fig.savefig(variable_dir / f"data_mc_{region}_byflav_nostack_log.png")
+
                 # add flavour ratio plots
                 fig, (ax, *raxs) = plt.subplots(
                     4,
@@ -204,7 +247,6 @@ def main(input_paths, output_path, lumi):
                     gridspec_kw={"height_ratios": [3, 1, 1, 1]},
                     sharex=True,
                     figsize=(8, 10),
-                    constrained_layout=True,
                 )
                 plot_1D_histogram(
                     mc_histograms=mc_flavor,

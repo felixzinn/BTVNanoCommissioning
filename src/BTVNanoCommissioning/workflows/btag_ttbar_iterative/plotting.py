@@ -37,6 +37,7 @@ def plot_1D_histogram(
     suptitle: str | None = None,
     ax: Axis = None,
     plot_ratio: bool = True,
+    stack: bool = True,
 ) -> tuple[Figure, tuple[Axis, Axis]]:
     with plt.rc_context(plot_style):
         fig: Figure
@@ -65,12 +66,13 @@ def plot_1D_histogram(
             com="13.6",
         )
         # plot MC histograms
+        histtype = "fill" if stack else "step"
         mplhep.histplot(
             list(mc_histograms.values()),
             ax=ax,
-            stack=True,
+            stack=stack,
             label=mc_histograms.keys(),
-            histtype="fill",
+            histtype=histtype,
             yerr=True,
             sort="yield",
             # color=[]
