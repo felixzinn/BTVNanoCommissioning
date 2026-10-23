@@ -1,9 +1,11 @@
 import os
+import time
 from pathlib import Path
 
 import awkward as ak
 import numpy as np
 from coffea import processor
+from coffea.util import coffea_console
 
 from BTVNanoCommissioning.helpers.func import dump_lumi, update
 from BTVNanoCommissioning.helpers.update_branch import missing_branch
@@ -29,7 +31,6 @@ from BTVNanoCommissioning.workflows.btag_ttbar_iterative.utils import (
     nano_object_overlap,
     reduce_and,
 )
-
 
 TAGGER_NAMES = {
     "btagDeepFlavB": "DeepFlav",
@@ -86,6 +87,18 @@ class BaseProcessor(processor.ProcessorABC):
         return accumulator
 
 
+def print_coffea_console(message: str):
+    """Print a message to the coffea console with a timestamp.
+
+    Args:
+        message (str): The message to print.
+    Returns:
+        None
+    """
+    current_time = time.strftime("%Y/%m/%d - %H:%M'%S")
+    coffea_console.print(f"{current_time} - {message}")
+
+
 class BTagIterativeSFProcessor(BaseProcessor):
     def __init__(
         self,
@@ -138,45 +151,10 @@ class BTagIterativeSFProcessor(BaseProcessor):
                 }
             )
 
-    # coffea stuff
-    @property
-    def accumulator(self):
-        return self._accumulator
-
-    def process(self, events):
-        events = missing_branch(events)
-        vetoed_events, shifts = common_shifts(self, events)
-        return processor.accumulate(
-            self.process_shift(update(vetoed_events, events), shift_name)
-            for events, shift_name in shifts
-        )
-
-    def process_shift(self, events, shift_name):
-        dataset = events.metadata["dataset"]
-        is_real_data = not hasattr(events, "genWeight")
-        shift_name = "nominal" if shift_name is None else shift_name
-        is_nominal = shift_name == "nominal"
-
-        output = {}
-        n_events = len(events)
-        if is_nominal:
-            # gen weight, if data fill with ones
-            output["sumw"] = ak.sum(getattr(events, "genWeight", np.ones(n_events)))
-
-        # =====================
-        # Event Selection
-        # =====================
-
-        # === lumi ===
-        lumi_mask = np.full((n_events,), True)
-        if is_real_data:
-            lumi_mask = self.lumi_mask(events.run, events.luminosityBlock)
-        # dump lumi for nominal case
-        if is_nominal:
-            output = dump_lumi(events[lumi_mask], output)
+        self.btag_wpdict_year = btag_wp_dict[f"{self._year}_{self._campaign}"]
 
         # === trigger ===
-        triggers = {
+        self.triggers = {
             "ee": [
                 "Ele23_Ele12_CaloIdL_TrackIdL_IsoVL",
                 "Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ",
@@ -193,6 +171,54 @@ class BTagIterativeSFProcessor(BaseProcessor):
             ],
         }
 
+    # coffea stuff
+    @property
+    def accumulator(self):
+        return self._accumulator
+
+    def process(self, events):
+        print_coffea_console("Processing Chunk")
+
+        events = missing_branch(events)
+        vetoed_events, shifts = common_shifts(self, events)
+
+        # NOTE: we want to calculate some shift independent quantities here
+        if shifts[0][1] is not None:
+            raise ValueError(
+                "First shift should be nominal (None). Check common_shifts() implementation."
+            )
+
+        print_coffea_console("Processing shifts")
+
+        return processor.accumulate(
+            self.process_shift(update(vetoed_events, shifted_events), shift_name)
+            for shifted_events, shift_name in shifts
+        )
+
+    def process_shift(self, events, shift_name):
+        # current_time = time.strftime("%Y/%m/%d - %H:%M'%S")
+        # print(f"{current_time} - Processing shift: {shift_name}")
+        dataset = events.metadata["dataset"]
+        shift_name = "nominal" if shift_name is None else shift_name
+        is_nominal = shift_name == "nominal"
+
+        is_real_data = not hasattr(events, "genWeight")
+        n_events = len(events)
+        # === lumi ===
+        lumi_mask = np.full((n_events,), True)
+        if is_real_data:
+            lumi_mask = self.lumi_mask(events.run, events.luminosityBlock)
+
+        output = {}
+        if is_nominal:
+            # gen weight, if data fill with ones
+            output["sumw"] = ak.sum(getattr(events, "genWeight", np.ones(n_events)))
+            # dump lumi for nominal case
+            output = dump_lumi(events[lumi_mask], output)
+
+        # =====================
+        # Event Selection
+        # =====================
         # === object selection ===
         # muon selection
         good_muons = muon_selection(events, campaign=self._campaign)
@@ -259,7 +285,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
         # trigger
         if self.channel == "mumu":
             channel_mask = reduce_and(
-                HLT_helper(events, triggers[self.channel]),  # trigger
+                HLT_helper(events, self.triggers[self.channel]),  # trigger
                 leading_muon_pt_cut,  # leading muon pt
                 ak.num(good_muons) == 2,  # number of muons
                 ak.num(good_electrons) == 0,  # number of electrons
@@ -269,7 +295,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
             )
         elif self.channel == "ee":
             channel_mask = reduce_and(
-                HLT_helper(events, triggers[self.channel]),
+                HLT_helper(events, self.triggers[self.channel]),
                 leading_electron_pt_cut,
                 ak.num(good_electrons) == 2,
                 ak.num(good_muons) == 0,
@@ -279,7 +305,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
             )
         elif self.channel == "emu":
             channel_mask = reduce_and(
-                HLT_helper(events, triggers[self.channel]),
+                HLT_helper(events, self.triggers[self.channel]),
                 (leading_electron_pt_cut | leading_muon_pt_cut),
                 ak.num(good_electrons) == 1,
                 ak.num(good_muons) == 1,
@@ -324,7 +350,6 @@ class BTagIterativeSFProcessor(BaseProcessor):
         # # tag and probe
         # # =====================
 
-        btag_wpdict_year = btag_wp_dict[f"{self._year}_{self._campaign}"]
         for i_tag_jet, i_probe_jet in [(0, 1), (1, 0)]:
             tag_jet = pruned_events.SelJet[:, i_tag_jet]
             for btagger in self.histogram_config["btaggers"]:
@@ -333,7 +358,7 @@ class BTagIterativeSFProcessor(BaseProcessor):
 
                 # assign to regions based on b-tag of tag jet
                 tagger_name = TAGGER_NAMES[btagger]
-                btag_dict = btag_wpdict_year[tagger_name]["b"]
+                btag_dict = self.btag_wpdict_year[tagger_name]["b"]
                 tag_jet_cut = {
                     "HF": b_score_tag >= btag_dict["M"],
                     "LF": b_score_tag < btag_dict["L"],
@@ -385,8 +410,10 @@ if __name__ == "__main__":
     import uproot
     from coffea.nanoevents import NanoAODSchema, NanoEventsFactory
 
-    filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/RunIII2024Summer24NanoAODv15/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/150X_mcRun3_2024_realistic_v2-v3/2810000/f60b4a6c-2801-43b0-b542-6d933a71a396.root"
-    dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
+    # filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/mc/RunIII2024Summer24NanoAODv15/TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8/NANOAODSIM/150X_mcRun3_2024_realistic_v2-v3/2810000/f60b4a6c-2801-43b0-b542-6d933a71a396.root"
+    # dataset_name = "TTto2L2Nu_TuneCP5_13p6TeV_powheg-pythia8"
+    filename = "root://cmsdcache-kit-disk.gridka.de:1094//store/data/Run2024C/Muon0/NANOAOD/MINIv6NANOv15-v1/2530000/677e3bb0-8199-4ffb-83af-165410a7b7a6.root"
+    dataset_name = "Run2024C"
     with uproot.open(filename) as file:
         chunk_size = 1000
         events = NanoEventsFactory.from_root(
