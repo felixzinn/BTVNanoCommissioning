@@ -53,7 +53,7 @@ def define_histograms(
     particle_properties: dict[str, tuple[str]],
     event_variables: Iterable[str],
 ) -> dict[str, Hist]:
-    abs_eta = axis.Variable([0.0, 0.8, 1.6, 2.5], name="eta", label="|$\eta$|")
+    abs_eta = axis.Variable([0.0, 0.8, 1.6, 2.5], name="eta", label=r"|$\eta$|")
     custom_pt = axis.Variable(
         [*range(0, 200, 10), 200, np.inf], name="pt", label=r"$p_{\mathrm{T}}$ / GeV"
     )
@@ -121,14 +121,27 @@ def fill_histograms(
     systematics: Iterable[str],
     weights,
 ) -> dict[str, Hist]:
+    available_variations = list(weights.variations)
     # loop over weight systematics
     for systematic in systematics:
         weight = (
             weights.partial_weight(exclude=exclude_btv)
-            if (systematic == "nominal" or systematic not in list(weights.variations))
+            if (systematic == "nominal" or systematic not in available_variations)
             else weights.weight(modifier=systematic)
         )
         weight = weight.reshape((-1, 1))  # needs to be 2d (events, 1)
+
+        # fill event variables
+        if systematic == "nominal":
+            for var, histogram in histograms["event_variables"].items():
+                val = events[var].to_numpy()
+                if val.ndim < 2:
+                    val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
+                histogram.fill_flattened(
+                    # syst=systematic,
+                    **{var: val},
+                    weight=weight,
+                )
 
         # NOTE: fill flattened is used to fill histograms from 2d arrays
         # so all arrays must be 2d (events, ...)
@@ -164,34 +177,24 @@ def fill_histograms(
                     weight=weight,
                 )
 
-        if systematic == "nominal":
-            # we do not need the shifts for other histograms
-            # fill particle properties
-            for (obj, prop), histogram in histograms["particle_properties"].items():
-                val = getattr(events[obj], prop).to_numpy()
-                if val.ndim < 2:
-                    val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
-                region = (
-                    events[f"region_{btagger}_{i_probe_jet}"]
-                    .to_numpy()
-                    .reshape((-1, 1))
-                )
-                histogram.fill_flattened(
-                    # syst=systematic,
-                    **{prop: val},
-                    region=region,
-                    weight=weight,
-                )
-
-            # fill event variables
-            for var, histogram in histograms["event_variables"].items():
-                val = events[var].to_numpy()
-                if val.ndim < 2:
-                    val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
-                histogram.fill_flattened(
-                    # syst=systematic,
-                    **{var: val},
-                    weight=weight,
-                )
+                if systematic == "nominal":
+                    # NOTE: this sums over the 2 probe jets directly
+                    # we do not need the shifts for other histograms
+                    # fill particle properties
+                    for (obj, prop), histogram in histograms["particle_properties"].items():
+                        val = getattr(events[obj], prop).to_numpy()
+                        if val.ndim < 2:
+                            val = val.reshape((-1, 1))  # needs to be 2d (events, 1)
+                        region = (
+                            events[f"region_{btagger}_{i_probe_jet}"]
+                            .to_numpy()
+                            .reshape((-1, 1))
+                        )
+                        histogram.fill_flattened(
+                            # syst=systematic,
+                            **{prop: val},
+                            region=region,
+                            weight=weight,
+                        )
 
     return histograms
