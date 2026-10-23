@@ -38,11 +38,9 @@ class PlotBtagIterative(law.Task):
             ),
         }
         if self.transfer:
-            out["eos"] = (
-                law.wlcg.WLCGDirectoryTarget(
-                    os.path.join("f/fzinn/BTV/btag_sf", *paths),
-                    fs="wlcg_fs",
-                ),
+            out["eos"] = law.wlcg.WLCGDirectoryTarget(
+                os.path.join("f/fzinn/BTV/btag_sf", *paths),
+                fs="wlcg_fs",
             )
         return out
 
