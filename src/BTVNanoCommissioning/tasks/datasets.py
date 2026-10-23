@@ -31,7 +31,15 @@ class FetchDatasets(law.Task):
     fetch_executor = luigi.ChoiceParameter(
         default="futures",
         choices=("futures", "iterative"),
-        description="Executor to fetch datasets"
+        description="Executor to fetch datasets",
+    )
+    fetch_workers = luigi.IntParameter(
+        default=4,
+        description="Number of workers to fetch datasets (for futures executor)",
+    )
+    verbose = luigi.BoolParameter(
+        default=False,
+        description="verbose flag for fetch.py script",
     )
 
     def run(self):
@@ -49,12 +57,16 @@ class FetchDatasets(law.Task):
             "--output",
             self.json,
             "--executor",
-            self.fetch_executor
+            self.fetch_executor,
+            "--workers",
+            str(self.fetch_workers)
         ]
         if self.skipvalidation:
             cmd.append("--skipvalidation")
         if self.overwrite:
             cmd.append("--overwrite")
+        if self.verbose:
+            cmd.append("--verbose")
 
         subprocess.run(cmd, check=True)
 

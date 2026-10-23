@@ -5,7 +5,6 @@ import subprocess
 import law
 import luigi
 import luigi.util
-import parsl
 
 from BTVNanoCommissioning.tasks.base import baseparameters
 from BTVNanoCommissioning.tasks.datasets import FetchDatasets
@@ -39,8 +38,12 @@ class processingparameters(luigi.Config):
         description="Chunk size for processing",
     )
     memory = luigi.FloatParameter(
-        default=4.0,
+        # default=4.0,
         description="Memory in GB for coffea processing",
+    )
+    retries = luigi.IntParameter(
+        default=3,
+        description="Number of retries for coffea processing",
     )
     is_syst = luigi.ChoiceParameter(
         default="False",
@@ -117,6 +120,10 @@ class ProcessDatasets(ProcessBase):
             str(self.scaleout),
             "--chunk",
             str(self.chunksize),
+            "--memory",
+            str(self.memory),
+            "--retries",
+            str(self.retries),
             "--isSyst",
             self.is_syst,
             "--rundir",
@@ -132,6 +139,8 @@ class ProcessDatasets(ProcessBase):
             cmd += ["--skipbadfiles"]
         if self.splitjobs:
             cmd += ["--splitjobs"]
+
+        print(f"Running command: {' '.join(cmd)}")
 
         subprocess.run(
             cmd,
