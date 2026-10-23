@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import pathlib
 import warnings
 
@@ -174,15 +175,71 @@ def main(input_paths, output_path, lumi, only_btag: bool = False):
         # btag has multiple axis
         elif "btag" in variable:
             # sum over eta, pt, jet_index; loop over regions
-            # index is (systematic, flavor, eta, pt, dR_jets, region, jet_index, btag_discriminant)
+            # index is (flavor, eta, pt, region, jet_index, btag_discriminant)
             for region in data_hist.axes["region"]:
-                data_hist_region = data_hist[sum, sum, sum, region, sum, :]
+                if "dR_jets" in data_hist.axes.name:
+                    # index is (flavor, eta, pt, dR, region, jet_index, btag_discriminant)
+                    data_hist_region = data_hist[sum, sum, sum, sum, region, sum, :]
+                    # split by sample
+                    mc_sum = {
+                        sample: hist[sum, sum, sum, sum, region, sum, :]
+                        for sample, hist in mc_histograms.items()
+                    }
+                    # split by flavor
+                    # c=4, b=5, light=0,1,6
+                    mc_flavor = {
+                        "b": sum(
+                            hist[hist_lib.loc(5), sum, sum, sum, region, sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                        "c": sum(
+                            hist[hist_lib.loc(4), sum, sum, sum, region, sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                        "l": sum(
+                            hist[
+                                [hist_lib.loc(v) for v in (0, 1, 6)],
+                                sum,
+                                sum,
+                                sum,
+                                region,
+                                sum,
+                                :,
+                            ][sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                    }
+                else:
+                    data_hist_region = data_hist[sum, sum, sum, region, sum, :]
+                    # split by sample
+                    mc_sum = {
+                        sample: hist[sum, sum, sum, region, sum, :]
+                        for sample, hist in mc_histograms.items()
+                    }
+                    # split by flavor
+                    # c=4, b=5, light=0,1,6
+                    mc_flavor = {
+                        "b": sum(
+                            hist[hist_lib.loc(5), sum, sum, region, sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                        "c": sum(
+                            hist[hist_lib.loc(4), sum, sum, region, sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                        "l": sum(
+                            hist[
+                                [hist_lib.loc(v) for v in (0, 1, 6)],
+                                sum,
+                                sum,
+                                region,
+                                sum,
+                                :,
+                            ][sum, :]
+                            for hist in mc_histograms.values()
+                        ),
+                    }
 
-                # split by sample
-                mc_sum = {
-                    sample: hist[sum, sum, sum, region, sum, :]
-                    for sample, hist in mc_histograms.items()
-                }
                 fig_suptitle = f"{region} region"
                 fig, (ax, rax) = plot_1D_histogram(
                     mc_histograms=mc_sum,
@@ -195,30 +252,6 @@ def main(input_paths, output_path, lumi, only_btag: bool = False):
                 fig.savefig(variable_dir / f"data_mc_{region}_log.png")
                 plt.close(fig)
 
-                # split by flavor
-                # c=4, b=5, light=0,1,6
-                mc_flavor = {
-                    "b": sum(
-                        hist[hist_lib.loc(5), sum, sum, region, sum, :]
-                        for hist in mc_histograms.values()
-                    ),
-                    "c": sum(
-                        hist[hist_lib.loc(4), sum, sum, region, sum, :]
-                        for hist in mc_histograms.values()
-                    ),
-                    "l": sum(
-                        hist[
-                            [hist_lib.loc(v) for v in (0, 1, 6)],
-                            sum,
-                            sum,
-                            region,
-                            sum,
-                            :,
-                        ][sum, :]
-                        for hist in mc_histograms.values()
-                    ),
-                }
-
                 fig, (ax, _) = plot_1D_histogram(
                     mc_histograms=mc_flavor,
                     data=data_hist_region,
@@ -228,6 +261,7 @@ def main(input_paths, output_path, lumi, only_btag: bool = False):
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav.png")
                 ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_log.png")
+                plt.close(fig)
 
                 fig, (ax, _) = plot_1D_histogram(
                     mc_histograms=mc_flavor,
@@ -239,6 +273,7 @@ def main(input_paths, output_path, lumi, only_btag: bool = False):
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_nostack.png")
                 ylog_scale(ax)
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_nostack_log.png")
+                plt.close(fig)
 
                 # add flavour ratio plots
                 fig, (ax, *raxs) = plt.subplots(
@@ -286,6 +321,277 @@ def main(input_paths, output_path, lumi, only_btag: bool = False):
                     rax.autoscale()
                 fig.savefig(variable_dir / f"data_mc_{region}_byflav_ratios_log.png")
                 plt.close(fig)
+
+                # # plot per pT/eta bin
+                # for pt, eta in itertools.product(
+                #     data_hist.axes["pt"], data_hist.axes["eta"]
+                # ):
+                #     if "dR_jets" in data_hist.axes.name:
+                #         data_hist_region = data_hist[
+                #             sum,
+                #             hist_lib.loc(eta[0]),
+                #             hist_lib.loc(pt[0]),
+                #             sum,
+                #             region,
+                #             sum,
+                #             :,
+                #         ]
+                #         mc_sum = {
+                #             sample: hist[
+                #                 sum,
+                #                 hist_lib.loc(eta[0]),
+                #                 hist_lib.loc(pt[0]),
+                #                 sum,
+                #                 region,
+                #                 sum,
+                #                 :,
+                #             ]
+                #             for sample, hist in mc_histograms.items()
+                #         }
+                #         mc_flavor = {
+                #             "b": sum(
+                #                 hist[
+                #                     hist_lib.loc(5),
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     sum,
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #             "c": sum(
+                #                 hist[
+                #                     hist_lib.loc(4),
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     sum,
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #             "l": sum(
+                #                 hist[
+                #                     [hist_lib.loc(v) for v in (0, 1, 6)],
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     sum,
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ][sum, :]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #         }
+                #     else:
+                #         data_hist_region = data_hist[
+                #             sum, hist_lib.loc(eta[0]), hist_lib.loc(pt[0]), region, sum, :
+                #         ]
+                #         mc_sum = {
+                #             sample: hist[
+                #                 sum, hist_lib.loc(eta[0]), hist_lib.loc(pt[0]), region, sum, :
+                #             ]
+                #             for sample, hist in mc_histograms.items()
+                #         }
+                #         mc_flavor = {
+                #             "b": sum(
+                #                 hist[
+                #                     hist_lib.loc(5),
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #             "c": sum(
+                #                 hist[
+                #                     hist_lib.loc(4),
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #             "l": sum(
+                #                 hist[
+                #                     [hist_lib.loc(v) for v in (0, 1, 6)],
+                #                     hist_lib.loc(eta[0]),
+                #                     hist_lib.loc(pt[0]),
+                #                     region,
+                #                     sum,
+                #                     :,
+                #                 ][sum, :]
+                #                 for hist in mc_histograms.values()
+                #             ),
+                #         }
+
+                #     eta = "to".join(str(e) for e in eta)
+                #     pt = "to".join(str(p) for p in pt)
+                #     fig_suptitle = f"{region} region"
+                #     fig, (ax, _) = plot_1D_histogram(
+                #         mc_histograms=mc_sum,
+                #         data=data_hist_region,
+                #         suptitle=fig_suptitle,
+                #         lumi=lumi,
+                #     )
+                #     fig.savefig(variable_dir / f"data_mc_{region}_eta{eta}_pT{pt}.png")
+                #     ylog_scale(ax)
+                #     fig.savefig(variable_dir / f"data_mc_{region}_eta{eta}_pT{pt}_log.png")
+                #     plt.close(fig)
+
+                #     fig, (ax, _) = plot_1D_histogram(
+                #         mc_histograms=mc_flavor,
+                #         data=data_hist_region,
+                #         suptitle=fig_suptitle,
+                #         lumi=lumi,
+                #     )
+                #     fig.savefig(
+                #         variable_dir / f"data_mc_{region}_eta{eta}_pT{pt}_byflav.png"
+                #     )
+                #     ylog_scale(ax)
+                #     fig.savefig(
+                #         variable_dir
+                #         / f"data_mc_{region}_eta{eta}_pT{pt}_byflav_log.png"
+                #     )
+                #     plt.close(fig)
+                # plot per pT/eta bin
+                for eta in data_hist.axes["eta"]:
+                    if "dR_jets" in data_hist.axes.name:
+                        data_hist_region = data_hist[
+                            sum,
+                            hist_lib.loc(eta[0]),
+                            sum,
+                            sum,
+                            region,
+                            sum,
+                            :,
+                        ]
+                        mc_sum = {
+                            sample: hist[
+                                sum,
+                                hist_lib.loc(eta[0]),
+                                sum,
+                                sum,
+                                region,
+                                sum,
+                                :,
+                            ]
+                            for sample, hist in mc_histograms.items()
+                        }
+                        mc_flavor = {
+                            "b": sum(
+                                hist[
+                                    hist_lib.loc(5),
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ]
+                                for hist in mc_histograms.values()
+                            ),
+                            "c": sum(
+                                hist[
+                                    hist_lib.loc(4),
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ]
+                                for hist in mc_histograms.values()
+                            ),
+                            "l": sum(
+                                hist[
+                                    [hist_lib.loc(v) for v in (0, 1, 6)],
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ][sum, :]
+                                for hist in mc_histograms.values()
+                            ),
+                        }
+                    else:
+                        data_hist_region = data_hist[
+                            sum, hist_lib.loc(eta[0]), sum, region, sum, :
+                        ]
+                        mc_sum = {
+                            sample: hist[sum, hist_lib.loc(eta[0]), sum, region, sum, :]
+                            for sample, hist in mc_histograms.items()
+                        }
+                        mc_flavor = {
+                            "b": sum(
+                                hist[
+                                    hist_lib.loc(5),
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ]
+                                for hist in mc_histograms.values()
+                            ),
+                            "c": sum(
+                                hist[
+                                    hist_lib.loc(4),
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ]
+                                for hist in mc_histograms.values()
+                            ),
+                            "l": sum(
+                                hist[
+                                    [hist_lib.loc(v) for v in (0, 1, 6)],
+                                    hist_lib.loc(eta[0]),
+                                    sum,
+                                    region,
+                                    sum,
+                                    :,
+                                ][sum, :]
+                                for hist in mc_histograms.values()
+                            ),
+                        }
+
+                    eta = "to".join(str(e) for e in eta)
+                    fig_suptitle = f"{region} region"
+                    fig, (ax, _) = plot_1D_histogram(
+                        mc_histograms=mc_sum,
+                        data=data_hist_region,
+                        suptitle=fig_suptitle,
+                        lumi=lumi,
+                    )
+                    fig.savefig(variable_dir / f"data_mc_{region}_eta{eta}.png")
+                    ylog_scale(ax)
+                    fig.savefig(variable_dir / f"data_mc_{region}_eta{eta}_log.png")
+                    plt.close(fig)
+
+                    fig, (ax, _) = plot_1D_histogram(
+                        mc_histograms=mc_flavor,
+                        data=data_hist_region,
+                        suptitle=fig_suptitle,
+                        lumi=lumi,
+                    )
+                    fig.savefig(variable_dir / f"data_mc_{region}_eta{eta}_byflav.png")
+                    ylog_scale(ax)
+                    fig.savefig(
+                        variable_dir / f"data_mc_{region}_eta{eta}_byflav_log.png"
+                    )
+                    plt.close(fig)
         else:
             non_plottable += {variable}
 

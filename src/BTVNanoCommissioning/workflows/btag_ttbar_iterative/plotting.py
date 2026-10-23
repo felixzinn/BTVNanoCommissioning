@@ -6,7 +6,7 @@ from hist import Hist
 from matplotlib.axis import Axis
 from matplotlib.figure import Figure
 
-from BTVNanoCommissioning.utils.plot_utils import plotratio
+from BTVNanoCommissioning.utils.plot_utils import color_map, plotratio
 
 plot_style = mplhep.style.CMS | {
     "figure.constrained_layout.use": True,
@@ -75,7 +75,7 @@ def plot_1D_histogram(
             histtype=histtype,
             yerr=True,
             sort="yield",
-            # color=[]
+            color=[color_map.get(k) for k in mc_histograms],
             # alpha=[]
         )
         if data is not None:
