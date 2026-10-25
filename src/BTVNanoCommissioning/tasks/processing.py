@@ -198,7 +198,10 @@ class GetLuminosity(ProcessBase):
 
     def run(self):
         coffea_output = self.input().load()
-        # coffea_output.pop("xsection", None)
+        # check if coffea output is tuple (the case for metrics)
+        if isinstance(coffea_output, tuple):
+            coffea_output = coffea_output[0]
+        coffea_output.pop("xsection", None)
         json_file = self.output()["json"]
         json_file.touch()
         lumi = get_lumi(
