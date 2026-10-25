@@ -31,6 +31,7 @@ class PlotBtagIterative(law.Task):
             self.version,
             self.__class__.__name__,
             "_".join([file.replace(".coffea", "") for file in self.input_files]),
+            "only_btag" if self.only_btag else "all_variables",
         ]
         out = {
             "local": law.LocalDirectoryTarget(
